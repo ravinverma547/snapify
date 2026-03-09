@@ -56,7 +56,7 @@ export class ReportController {
     }
   }
 
-  // 3. Update Status (Fixed Type & Brackets)
+  // 3. Update Status (TypeScript Error Fixed & Existence Check Integrated)
   async updateReportStatus(req: AuthRequest, res: Response) {
     try {
       const { reportId } = req.params;
@@ -66,18 +66,28 @@ export class ReportController {
         return res.status(400).json({ success: false, message: "ID missing hai" });
       }
 
+      // 1. Pehle check karo ki kya ye report exist karti bhi hai?
+      const existingReport = await prisma.report.findUnique({
+        where: { id: reportId as string } 
+      });
+
+      if (!existingReport) {
+        return res.status(404).json({ 
+          success: false, 
+          message: `Bhai, report ID (${reportId}) database mein nahi mili!` 
+        });
+      }
+
+      // 2. Agar mil gayi, toh update karo
       const updatedReport = await prisma.report.update({
-        where: { 
-          id: reportId as string 
-        },
-        data: { 
-          status: status as any 
-        },
+        where: { id: reportId as string },
+        data: { status: status as any },
       });
 
       res.status(200).json({ success: true, data: updatedReport });
     } catch (error: any) {
+      console.error("Update Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
-} 
+} // <--- Ye wala bracket zaroori tha class ko band karne ke liye

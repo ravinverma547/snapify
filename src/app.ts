@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import cors from "cors";
 
 // Sabhi routes ko import karein
@@ -23,6 +24,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle karne ke liye
 
+// Serve simple test client and static assets from `public/`
+app.use(express.static(path.join(__dirname, "..", "public")));
+
 // 2. Routes Implementation
 const version = "/api/v1";
 
@@ -43,6 +47,11 @@ app.use(`${version}/streaks`, streakRoutes);
 // 3. Health Check
 app.get("/", (_req, res) => {
   res.send("Snapify Backend is Live! 🚀");
+});
+
+// Simple route to serve the test client (also available at /test-client.html)
+app.get("/test-client", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "test-client.html"));
 });
 
 // 4. Global Error Handler (Optional but helpful)

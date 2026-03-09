@@ -3,7 +3,7 @@ import prisma from "../../config/prisma";
 import { AuthRequest } from "../../middlewares/auth.middleware";
 
 export class StreakController {
-  // 1. User ki saari active streaks dekhna
+  // 1. User ki saari active streaks dekhna (API Endpoint)
   async getMyStreaks(req: AuthRequest, res: Response) {
     try {
       const userId = req.user?.id;
@@ -12,7 +12,7 @@ export class StreakController {
         where: {
           OR: [{ requesterId: userId }, { addresseeId: userId }],
           status: "ACCEPTED",
-          streak: { gt: 0 }, // Sirf wahi dikhao jo 0 se zyada hain
+          streak: { gt: 0 },
         },
         include: {
           requester: { select: { username: true, avatarUrl: true } },
@@ -27,57 +27,73 @@ export class StreakController {
   }
 
   /**
-   * 2. Streak Update Logic (Internal Function)
-   * Ye function tab call hoga jab koi Snap bhejega.
+   * 2. Streak Update Logic (Internal Static Function)
+   * Isko SnapController se call karte hain.
    */
   static async updateStreak(senderId: string, receiverId: string) {
-    const now = new Date();
-    const oneDayInMs = 24 * 60 * 60 * 1000;
-    const twoDaysInMs = 48 * 60 * 60 * 1000;
+    try {
+      const now = new Date();
+      // TESTING: sirf 1 second ka gap rakha hai taaki Postman pe turant result dikhe
+      const minGap = 1000; 
+      const oneDayInMs = 24 * 60 * 60 * 1000;
+      const twoDaysInMs = 48 * 60 * 60 * 1000;
 
-    // Check friendship record
-    const friendship = await prisma.friendship.findFirst({
-      where: {
-        OR: [
-          { requesterId: senderId, addresseeId: receiverId },
-          { requesterId: receiverId, addresseeId: senderId },
-        ],
-        status: "ACCEPTED",
-      },
-    });
-
-    if (!friendship) return;
-
-    const lastInteraction = new Date(friendship.lastInteraction).getTime();
-    const timeDiff = now.getTime() - lastInteraction;
-
-    if (timeDiff < oneDayInMs) {
-      // 24 ghante ke andar snap bheja hai -> Streak maintain hai par increment nahi hogi (daily limit)
-      return;
-    } else if (timeDiff >= oneDayInMs && timeDiff < twoDaysInMs) {
-      // 24 se 48 ghante ke beech bheja -> Streak +1!
-      await prisma.friendship.update({
-        where: { id: friendship.id },
-        data: {
-          streak: { increment: 1 },
-          lastInteraction: now,
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId: senderId, addresseeId: receiverId },
+            { requesterId: receiverId, addresseeId: senderId },
+          ],
+          status: "ACCEPTED",
         },
       });
 
-      // User ka overall Snap Score bhi +10 kar dete hain (Bonus!)
-      await prisma.user.updateMany({
-        where: { id: { in: [senderId, receiverId] } },
-        data: { score: { increment: 10 } }
-      });
-    } else {
-      // 48 ghante se zyada ho gaye -> Streak Tut Gayi (Reset to 0)
-      await prisma.friendship.update({
-        where: { id: friendship.id },
-        data: {
-          streak: 0,
-          lastInteraction: now,
-        },
-      });
+      if (!friendship) {
+        console.log("Friendship status 'ACCEPTED' nahi mili.");
+        return;
+      }
+
+      const lastInteraction = new Date(friendship.lastInteraction).getTime();
+      const timeDiff = now.getTime() - lastInteraction;
+
+      // --- STREAK LOGIC ---
+
+      if (timeDiff < minGap) {
+        // Bahut jaldi snap bhej di (Dhyan rakho: Real app mein yahan 24h ka gap hona chahiye)
+        console.log("Wait for a few seconds to update streak again!");
+        return;
+      } 
+      else if (timeDiff >= minGap && timeDiff < twoDaysInMs) {
+        // Streak badhao
+        await prisma.friendship.update({
+          where: { id: friendship.id },
+          data: {
+            streak: { increment: 1 },
+            lastInteraction: now,
+          },
+        });
+
+        // Bonus: Dono users ka score +10
+        await prisma.user.updateMany({
+          where: { id: { in: [senderId, receiverId] } },
+          data: { score: { increment: 10 } },
+        });
+
+        console.log("🔥 Streak Incremented and Score +10!");
+      } 
+      else {
+        // 48 hours se zyada ho gaye -> Streak Tut Gayi
+        await prisma.friendship.update({
+          where: { id: friendship.id },
+          data: {
+            streak: 0,
+            lastInteraction: now,
+          },
+        });
+        console.log("💀 Streak Reset to 0 (Too much gap)");
+      }
+    } catch (error) {
+      console.error("Streak Update Error:", error);
     }
   }
 }

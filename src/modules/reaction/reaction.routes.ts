@@ -5,7 +5,7 @@ import { protect } from "../../middlewares/auth.middleware";
 const router = Router();
 const reactionController = new ReactionController();
 
-router.use(protect);
+//router.use(protect);
 
 // POST: reaction toggle karne ke liye (Body mein messageId aur emoji jayega)
 router.post("/toggle", reactionController.toggleReaction);

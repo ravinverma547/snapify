@@ -62,7 +62,8 @@ export class FriendController {
       // Yahan Type casting (as string) add kar di hai
       const requestId = req.params.requestId as string; 
       const myId = req.user?.id;
-
+console.log("Accepting Request ID:", requestId); // Ye line dalo
+    // ... baaki code
       if (!requestId) {
           return res.status(400).json({ message: "Request ID zaroori hai!" });
       }
@@ -80,6 +81,8 @@ export class FriendController {
         where: { id: requestId }, // Yahan bhi error fix ho jayega
         data: { status: "ACCEPTED" },
       });
+  
+  
 
       // Notification logic...
       await prisma.notification.create({

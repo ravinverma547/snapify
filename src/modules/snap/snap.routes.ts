@@ -1,15 +1,24 @@
 import { Router } from "express";
 import { SnapController } from "./snap.controller";
-import { protect } from "../../middlewares/auth.middleware";
-import upload from "../../middlewares/upload.middleware"; 
+import upload from "../../uploads/upload.middleware"; 
+import { protect } from "../../middlewares/auth.middleware"; 
 
 const router = Router();
 const snapController = new SnapController();
 
-router.use(protect);
+// 1. Snap bhejne ke liye
+router.post(
+  "/send", 
+  protect, 
+  upload.single("file"), 
+  snapController.sendSnap
+);
 
-// Frontend par form-data mein key ka naam 'file' rakhna
-router.post("/send", upload.single("file"), snapController.sendSnap);
-router.get("/inbox", snapController.getMySnaps);
+// 2. Apni snaps dekhne ke liye (GET request)
+router.get("/my-snaps", protect, snapController.getMySnaps);
+
+// 3. Snap open karne ke liye (PATCH request)
+// Dhyaan rakhna URL mein :snapId dynamic parameter hai
+router.patch("/open/:snapId", protect, snapController.openSnap);
 
 export default router;
