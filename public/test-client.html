@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+<head>
+    <title>Snapchat Clone - Full Reactions</title>
+    <style>
+        body { font-family: sans-serif; background: #FFFC00; margin: 20px; }
+        .chat-box { background: white; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        #messages { height: 400px; border: 1px solid #eee; overflow-y: auto; margin-bottom: 10px; padding: 10px; display: flex; flex-direction: column; background: #fafafa; border-radius: 10px; }
+        
+        /* Message Styling */
+        .msg { padding: 10px; margin: 10px 5px; border-radius: 12px; max-width: 70%; word-wrap: break-word; position: relative; cursor: pointer; user-select: none; transition: transform 0.1s; }
+        .msg:active { transform: scale(0.95); }
+        .me { background: #0084ff; color: white; align-self: flex-end; }
+        .other { background: #e5e5ea; align-self: flex-start; }
+        
+        .msg * { pointer-events: none; }
+
+        /* Reaction Badge with Pop Animation */
+        .reaction-badge {
+            position: absolute;
+            bottom: -15px;
+            right: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 10;
+            animation: pop 0.2s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.5); }
+            100% { transform: scale(1); }
+        }
+        
+        input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 5px; }
+        .btn-group { background: #222; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div id="notification-layer" style="position:fixed; top:0; left:0; width:100%; z-index:9999999; pointer-events:none;"></div>
+
+    <div class="chat-box">
+        <h3 style="text-align: center;">👻 Snapchat Mode</h3>
+        <input id="userId" placeholder="MERA NAAM (e.g., ravin)">
+        <input id="receiverId" placeholder="RECEIVER KA NAAM (Personal)">
+        <input id="convId" placeholder="ROOM/GROUP ID (e.g., 123)">
+        <button id="connectBtn" onclick="connectSocket()">CONNECT NOW</button>
+        
+        <div id="messages"></div>
+        
+        <input id="msgInput" placeholder="Type message...">
+        <div style="display:flex; gap: 5px;">
+            <button onclick="sendMessage()" style="background: #0084ff;">SEND PERSONAL</button>
+            <button onclick="sendGroupMessage()" class="btn-group">SEND GROUP</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script>
+        let socket;
+        const msgDiv = document.getElementById('messages');
+        let activeReactions = {}; // State tracking for toggle
+
+        function connectSocket() {
+            const userId = document.getElementById('userId').value.trim();
+            const convId = document.getElementById('convId').value.trim();
+
+            if (!userId || !convId) return alert("Bhai, Naam aur Room ID bharo!");
+
+            if (socket) socket.disconnect();
+            socket = io("http://localhost:5000");
+
+            socket.on('connect', () => {
+                socket.emit('setup', userId);
+                socket.emit('join_chat', convId); 
+                document.getElementById('connectBtn').innerText = "Connected ✅";
+                document.getElementById('connectBtn').style.background = "green";
+            });
+
+            socket.on('message_received', (data) => {
+                const myId = document.getElementById('userId').value.trim();
+                const type = data.senderId === myId ? 'me' : 'other';
+                showMsg(data.senderId, data.content, type, data.messageId);
+            });
+
+            socket.on('group_message_received', (data) => {
+                showMsg(data.senderName, data.content, 'other', data.messageId);
+            });
+
+            // ⚡ Real-time Reaction Listener (Sabke liye chalega)
+            socket.on('reaction_updated', (data) => {
+                console.log("Reaction update from socket:", data);
+                const isRemoved = data.actionType === "REMOVED";
+                updateReactionUI(data.messageId, data.emoji, isRemoved);
+                activeReactions[data.messageId] = isRemoved ? null : data.emoji;
+            });
+
+            socket.on('notification_received', (data) => {
+                showSnapAlert(data.title, data.message);
+            });
+        }
+
+        // --- ⚡ Updated Reaction Handler (With Toggle & Socket) ---
+        async function handleReaction(messageId, emoji) {
+            const userId = document.getElementById('userId').value.trim();
+            const roomId = document.getElementById('convId').value.trim();
+
+            // Toggle Logic: Check if already reacted
+            let isRemoved = activeReactions[messageId] === emoji;
+            const actionType = isRemoved ? "REMOVED" : "ADDED";
+
+            // 1. Local UI Update (Fast Feel)
+            updateReactionUI(messageId, emoji, isRemoved);
+            activeReactions[messageId] = isRemoved ? null : emoji;
+
+            // 2. Broadcast to Others via Socket
+            if (socket) {
+                socket.emit('send_reaction', { messageId, emoji, userId, roomId, actionType });
+            }
+
+            // 3. Backend DB Update
+            try {
+                const response = await fetch('http://localhost:5000/api/v1/reactions/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messageId, emoji, userId, roomId })
+                });
+
+                if (!response.ok) throw new Error("Backend not found");
+            } catch (err) {
+                console.warn("DB not updated, but socket worked!");
+            }
+        }
+
+        function updateReactionUI(messageId, emoji, isRemoved) {
+            const badge = document.getElementById(`react-${messageId}`);
+            if (badge) {
+                badge.innerText = isRemoved ? "" : emoji;
+                badge.style.display = isRemoved ? "none" : "block";
+            }
+        }
+
+        function sendMessage() {
+            const content = document.getElementById('msgInput').value;
+            const userId = document.getElementById('userId').value.trim();
+            const receiverId = document.getElementById('receiverId').value.trim();
+            const convId = document.getElementById('convId').value.trim();
+            const msgId = "msg-" + Date.now();
+
+            if (!content || !socket || !receiverId) return alert("Receiver Name bharo!");
+
+            socket.emit('new_message', { 
+                conversationId: convId, senderId: userId, content: content, receiverId: receiverId, messageId: msgId
+            });
+
+            showMsg('Me', content, 'me', msgId);
+            document.getElementById('msgInput').value = '';
+        }
+
+        function sendGroupMessage() {
+            const content = document.getElementById('msgInput').value;
+            const groupId = document.getElementById('convId').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            const msgId = "msg-" + Date.now();
+
+            if (!content || !socket || !groupId) return alert("Room ID bharo!");
+
+            socket.emit('new_group_message', {
+                groupId: groupId, senderId: userId, senderName: userId, content: content, messageId: msgId
+            });
+
+            showMsg('Me', content, 'me', msgId);
+            document.getElementById('msgInput').value = '';
+        }
+
+        function showMsg(sender, text, type, msgId) {
+            const div = document.createElement('div');
+            const idToUse = msgId || "msg-" + Date.now();
+            div.className = `msg ${type}`;
+            div.id = idToUse;
+            
+            div.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                handleReaction(idToUse, '❤️');
+            });
+
+            div.innerHTML = `
+                <small style="display:block; font-size:10px; margin-bottom:3px; opacity:0.8;">${sender}</small>
+                ${text}
+                <div class="reaction-badge" id="react-${idToUse}"></div>
+            `;
+            
+            msgDiv.appendChild(div);
+            msgDiv.scrollTop = msgDiv.scrollHeight;
+        }
+
+        function showSnapAlert(title, message) {
+            const layer = document.getElementById('notification-layer');
+            const notifyDiv = document.createElement('div');
+            Object.assign(notifyDiv.style, {
+                margin: "20px auto", width: "fit-content", backgroundColor: "#FFFC00",
+                padding: "10px 25px", borderRadius: "50px", border: "3px solid black",
+                fontWeight: "bold", textAlign: "center", boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
+                pointerEvents: "auto"
+            });
+            notifyDiv.innerHTML = `👻 ${title}: ${message}`;
+            layer.appendChild(notifyDiv);
+            setTimeout(() => notifyDiv.remove(), 4000);
+        }
+    </script>
+</body>
+</html>

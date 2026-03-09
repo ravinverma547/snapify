@@ -1,38 +1,79 @@
 import { Server, Socket } from "socket.io";
-import prisma from "../config/prisma";
 
 export const chatHandler = (io: Server, socket: Socket) => {
-  // User ko uske personal room mein join karwana (for notifications)
+  
+  // 1. SETUP: Jab user app kholta hai, wo apne naam ke room mein baith jata hai
   socket.on("setup", (userId: string) => {
-    socket.join(userId);
-    console.log(`User ${userId} is online`);
-    socket.emit("connected");
+    if (!userId) return;
+    const cleanUserId = userId.toString().trim().replace(/['"]+/g, '');
+    socket.join(cleanUserId); 
+    console.log(`✅ ${cleanUserId} is online (for personal chats)`);
   });
 
-  // Chat room join karna (Specific conversation ke liye)
-  socket.on("join_chat", (conversationId: string) => {
-    socket.join(conversationId);
-    console.log(`User joined room: ${conversationId}`);
+  // 2. JOIN GROUP: Jab user kisi group chat par click karta hai
+  socket.on("join_chat", (groupId: string) => {
+    if (!groupId) return;
+    const cleanGroupId = groupId.toString().trim().replace(/['"]+/g, '');
+    socket.join(cleanGroupId);
+    console.log(`🏠 User entered Group Room: ${cleanGroupId}`);
   });
 
-  // Typing start hona
-  socket.on("typing", (room: string) => socket.in(room).emit("typing"));
-  socket.on("stop_typing", (room: string) => socket.in(room).emit("stop_typing"));
+  // 3. PERSONAL LOGIC (Direct to Person)
+  socket.on("new_message", (payload: any) => {
+    const { senderId, content, receiverId, messageId } = payload;
+    const cleanReceiverId = receiverId?.toString().trim();
 
-  // Naya Message bhejna
-  socket.on("new_message", async (newMessageReceived: any) => {
-    const { conversationId, senderId, content, receiverId } = newMessageReceived;
+    if (!cleanReceiverId) {
+      console.warn('new_message missing receiverId:', payload);
+      return;
+    }
 
-    if (!conversationId || !senderId) return console.log("Invalid message data");
-
-    // 1. Live message room mein bhejna (Real-time update)
-    socket.in(conversationId).emit("message_received", newMessageReceived);
-
-    // 2. Receiver ko notification bhejna (Agar wo kisi aur screen par hai)
-    socket.in(receiverId).emit("notification_received", {
-      type: "NEW_MESSAGE",
-      from: senderId,
-      text: content
+    // Us bande ki personal ID par message aur notification bhejo
+    io.to(cleanReceiverId).emit("message_received", { senderId, content, receiverId: cleanReceiverId, messageId });
+    io.to(cleanReceiverId).emit("notification_received", {
+      title: `Private Snap from ${senderId}`,
+      message: content,
+      receiverId: cleanReceiverId
     });
+    console.log(`👤 Private: ${senderId} -> ${cleanReceiverId}`);
+  });
+
+  // 4. GROUP LOGIC (Broadcast to Room)
+  socket.on("new_group_message", (payload: any) => {
+    const { groupId, senderId, senderName, content, messageId } = payload;
+    const cleanGroupId = groupId?.trim();
+
+    // Poore group room mein message aur notification bhejo (Except sender)
+    socket.to(cleanGroupId).emit("group_message_received", {
+      senderName,
+      content,
+      groupId: cleanGroupId,
+      messageId
+    });
+
+    socket.to(cleanGroupId).emit("notification_received", {
+      title: `Group: ${cleanGroupId}`,
+      message: `${senderName}: ${content}`
+    });
+    console.log(`👥 Group: ${senderName} sent msg to ${cleanGroupId}`);
+  });
+
+  // ⚡ 5. REACTION LOGIC (Personal + Group Broadcast)
+  // Amit double click karega toh ye event chalega aur Ravin ko dikhayega
+  socket.on("send_reaction", (payload: any) => {
+    const { messageId, emoji, userId, roomId, actionType } = payload;
+    
+    if (!roomId) return;
+    const cleanRoomId = roomId.toString().trim().replace(/['"]+/g, '');
+
+    // socket.to(room) ka matlab sender ko chhod kar room mein baaki sabko bhej do
+    socket.to(cleanRoomId).emit("reaction_updated", {
+      messageId,
+      emoji,
+      userId,
+      actionType // "ADDED" ya "REMOVED"
+    });
+
+    console.log(`❤️ Reaction: ${userId} ${actionType} ${emoji} on ${messageId} in room ${cleanRoomId}`);
   });
 };
