@@ -7,13 +7,12 @@ const friendController = new FriendController();
 
 router.use(protect);
 
-// Purane names: sendFriendRequest -> Naya: sendRequest
-router.post("/send", friendController.sendRequest); 
-
-// Purane names: acceptFriendRequest -> Naya: acceptRequest
-router.patch("/accept/:requestId", friendController.acceptRequest); 
-
-// Dost dekhne ke liye list route
+router.post("/send", friendController.sendRequest);
+router.patch("/accept/:requestId", friendController.acceptRequest);
+router.patch("/reject/:requestId", friendController.rejectRequest);
+router.delete("/unfriend/:friendId", friendController.unfriendUser);
 router.get("/list", friendController.getFriendsList);
+router.get("/pending", friendController.getPendingRequests);
+router.get("/status/:userId", friendController.getFriendshipStatus);
 
 export default router;

@@ -7,10 +7,11 @@ const storage = new CloudinaryStorage({
   params: async (req, file) => {
     // File extension check karne ke liye logic
     const isVideo = file.mimetype.startsWith("video");
+    const isAudio = file.mimetype.startsWith("audio");
     return {
       folder: "snapify_uploads",
-      resource_type: isVideo ? "video" : "image", 
-      allowed_formats: ["jpg", "jpeg", "png", "mp4", "mov"],
+      resource_type: (isVideo || isAudio) ? "video" : "image", 
+      allowed_formats: ["jpg", "jpeg", "png", "mp4", "mov", "webm", "mp3", "wav"],
     };
   },
 });

@@ -1,217 +1,320 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>Snapchat Clone - Full Reactions</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Snapify | Integrated Fix</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #FFFC00; margin: 20px; }
-        .chat-box { background: white; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        #messages { height: 400px; border: 1px solid #eee; overflow-y: auto; margin-bottom: 10px; padding: 10px; display: flex; flex-direction: column; background: #fafafa; border-radius: 10px; }
-        
-        /* Message Styling */
-        .msg { padding: 10px; margin: 10px 5px; border-radius: 12px; max-width: 70%; word-wrap: break-word; position: relative; cursor: pointer; user-select: none; transition: transform 0.1s; }
-        .msg:active { transform: scale(0.95); }
-        .me { background: #0084ff; color: white; align-self: flex-end; }
-        .other { background: #e5e5ea; align-self: flex-start; }
-        
-        .msg * { pointer-events: none; }
-
-        /* Reaction Badge with Pop Animation */
-        .reaction-badge {
-            position: absolute;
-            bottom: -15px;
-            right: 10px;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            padding: 2px 8px;
-            font-size: 16px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            display: none;
-            z-index: 10;
-            animation: pop 0.2s ease-out;
-        }
-
-        @keyframes pop {
-            0% { transform: scale(0.5); }
-            100% { transform: scale(1); }
-        }
-        
-        input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 5px; }
-        .btn-group { background: #222; margin-top: 5px; }
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+        body { font-family: 'Poppins', sans-serif; background-color: #000; color: white; overflow: hidden; }
+        .snap-yellow { background-color: #FFFC00; color: black; }
+        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .active-tab { color: #FFFC00 !important; }
+        .msg-me { background: #00baff; border-radius: 18px 18px 0 18px; }
+        .msg-other { background: #333; border-radius: 18px 18px 18px 0; }
     </style>
 </head>
 <body>
-    <div id="notification-layer" style="position:fixed; top:0; left:0; width:100%; z-index:9999999; pointer-events:none;"></div>
+    <div id="root"></div>
 
-    <div class="chat-box">
-        <h3 style="text-align: center;">👻 Snapchat Mode</h3>
-        <input id="userId" placeholder="MERA NAAM (e.g., ravin)">
-        <input id="receiverId" placeholder="RECEIVER KA NAAM (Personal)">
-        <input id="convId" placeholder="ROOM/GROUP ID (e.g., 123)">
-        <button id="connectBtn" onclick="connectSocket()">CONNECT NOW</button>
-        
-        <div id="messages"></div>
-        
-        <input id="msgInput" placeholder="Type message...">
-        <div style="display:flex; gap: 5px;">
-            <button onclick="sendMessage()" style="background: #0084ff;">SEND PERSONAL</button>
-            <button onclick="sendGroupMessage()" class="btn-group">SEND GROUP</button>
-        </div>
-    </div>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const API_BASE = "http://localhost:5001/api/v1";
+        const SOCKET_URL = "http://localhost:5001";
 
-    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
-    <script>
-        let socket;
-        const msgDiv = document.getElementById('messages');
-        let activeReactions = {}; // State tracking for toggle
-
-        function connectSocket() {
-            const userId = document.getElementById('userId').value.trim();
-            const convId = document.getElementById('convId').value.trim();
-
-            if (!userId || !convId) return alert("Bhai, Naam aur Room ID bharo!");
-
-            if (socket) socket.disconnect();
-            socket = io("http://localhost:5000");
-
-            socket.on('connect', () => {
-                socket.emit('setup', userId);
-                socket.emit('join_chat', convId); 
-                document.getElementById('connectBtn').innerText = "Connected ✅";
-                document.getElementById('connectBtn').style.background = "green";
+        function App() {
+            const [user, setUser] = useState(() => {
+                const saved = localStorage.getItem('user');
+                try { return (saved && saved !== "undefined") ? JSON.parse(saved) : null; }
+                catch { return null; }
             });
+            const [token, setToken] = useState(localStorage.getItem('token') || null);
+            const [tab, setTab] = useState('camera'); 
+            const socketRef = useRef(null); // Ref name changed to socketRef for clarity
 
-            socket.on('message_received', (data) => {
-                const myId = document.getElementById('userId').value.trim();
-                const type = data.senderId === myId ? 'me' : 'other';
-                showMsg(data.senderId, data.content, type, data.messageId);
-            });
+            useEffect(() => {
+                if (token && user?.id) {
+                    socketRef.current = io(SOCKET_URL);
+                    socketRef.current.emit('setup', user.id);
+                    
+                    socketRef.current.on('notification_received', (data) => {
+                        console.log("Real-time Notification:", data);
+                    });
+                }
+                return () => socketRef.current?.disconnect();
+            }, [token, user]);
 
-            socket.on('group_message_received', (data) => {
-                showMsg(data.senderName, data.content, 'other', data.messageId);
-            });
+            useEffect(() => { lucide.createIcons(); }, [tab, token, user]);
 
-            // ⚡ Real-time Reaction Listener (Sabke liye chalega)
-            socket.on('reaction_updated', (data) => {
-                console.log("Reaction update from socket:", data);
-                const isRemoved = data.actionType === "REMOVED";
-                updateReactionUI(data.messageId, data.emoji, isRemoved);
-                activeReactions[data.messageId] = isRemoved ? null : data.emoji;
-            });
-
-            socket.on('notification_received', (data) => {
-                showSnapAlert(data.title, data.message);
-            });
-        }
-
-        // --- ⚡ Updated Reaction Handler (With Toggle & Socket) ---
-        async function handleReaction(messageId, emoji) {
-            const userId = document.getElementById('userId').value.trim();
-            const roomId = document.getElementById('convId').value.trim();
-
-            // Toggle Logic: Check if already reacted
-            let isRemoved = activeReactions[messageId] === emoji;
-            const actionType = isRemoved ? "REMOVED" : "ADDED";
-
-            // 1. Local UI Update (Fast Feel)
-            updateReactionUI(messageId, emoji, isRemoved);
-            activeReactions[messageId] = isRemoved ? null : emoji;
-
-            // 2. Broadcast to Others via Socket
-            if (socket) {
-                socket.emit('send_reaction', { messageId, emoji, userId, roomId, actionType });
+            if (!token || !user) {
+                return <Auth setToken={setToken} setUser={setUser} />;
             }
 
-            // 3. Backend DB Update
-            try {
-                const response = await fetch('http://localhost:5000/api/v1/reactions/toggle', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messageId, emoji, userId, roomId })
-                });
+            return (
+                <div className="h-screen w-full max-w-md mx-auto relative flex flex-col bg-black overflow-hidden border-x border-zinc-800">
+                    <header className="absolute top-0 w-full p-4 flex justify-between items-center z-50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-yellow-400 flex items-center justify-center font-bold cursor-pointer" onClick={() => setTab('profile')}>
+                                {user?.username?.[0].toUpperCase() || '?'}
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="bg-zinc-800/60 p-2 rounded-full"><i data-lucide="search" className="w-5 h-5"></i></div>
+                            <div className="bg-zinc-800/60 p-2 rounded-full" onClick={() => setTab('profile')}><i data-lucide="settings" className="w-5 h-5"></i></div>
+                        </div>
+                    </header>
 
-                if (!response.ok) throw new Error("Backend not found");
-            } catch (err) {
-                console.warn("DB not updated, but socket worked!");
-            }
+                    <div className="flex-1 overflow-y-auto hide-scrollbar pb-24 pt-16">
+                        {tab === 'camera' && <CameraView user={user} token={token} />}
+                        {tab === 'chat' && <ChatList user={user} token={token} socketInstance={socketRef.current} />}
+                        {tab === 'stories' && <Stories token={token} />}
+                        {tab === 'profile' && <Profile user={user} setUser={setUser} setToken={setToken} />}
+                    </div>
+
+                    <nav className="fixed bottom-0 w-full max-w-md h-20 bg-black/90 backdrop-blur-xl flex justify-around items-center px-4 border-t border-zinc-900 z-50">
+                        <button onClick={() => setTab('map')} className={tab === 'map' ? 'active-tab' : 'text-zinc-500'}><i data-lucide="map-pin"></i></button>
+                        <button onClick={() => setTab('chat')} className={tab === 'chat' ? 'active-tab' : 'text-zinc-500'}><i data-lucide="message-square"></i></button>
+                        <button onClick={() => setTab('camera')} className="relative">
+                            <div className={`w-14 h-14 rounded-full border-4 ${tab === 'camera' ? 'border-yellow-400' : 'border-white'} flex items-center justify-center`}>
+                                <div className="w-10 h-10 rounded-full bg-white"></div>
+                            </div>
+                        </button>
+                        <button onClick={() => setTab('stories')} className={tab === 'stories' ? 'active-tab' : 'text-zinc-500'}><i data-lucide="users"></i></button>
+                        <button onClick={() => setTab('spotlight')} className={tab === 'spotlight' ? 'active-tab' : 'text-zinc-500'}><i data-lucide="play"></i></button>
+                    </nav>
+                </div>
+            );
         }
 
-        function updateReactionUI(messageId, emoji, isRemoved) {
-            const badge = document.getElementById(`react-${messageId}`);
-            if (badge) {
-                badge.innerText = isRemoved ? "" : emoji;
-                badge.style.display = isRemoved ? "none" : "block";
-            }
+        function Auth({ setToken, setUser }) {
+            const [isLogin, setIsLogin] = useState(true);
+            const [form, setForm] = useState({ username: '', email: '', password: '' });
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    const endpoint = isLogin ? "/auth/login" : "/auth/register";
+                    const payload = isLogin 
+                        ? { identifier: form.email || form.username, password: form.password } 
+                        : { username: form.username, email: form.email, password: form.password };
+                    
+                    const res = await axios.post(API_BASE + endpoint, payload);
+                    if (res.data.success) {
+                        const userData = res.data.user;
+                        const userToken = res.data.token;
+                        localStorage.setItem('token', userToken);
+                        localStorage.setItem('user', JSON.stringify(userData));
+                        setToken(userToken);
+                        setUser(userData);
+                    }
+                } catch (err) { alert(err.response?.data?.message || "Error connecting to server"); }
+            };
+
+            return (
+                <div className="h-screen flex flex-col items-center justify-center p-8 bg-black w-full">
+                    <div className="snap-yellow p-4 rounded-3xl mb-6 shadow-lg"><i data-lucide="ghost" className="w-12 h-12"></i></div>
+                    <h1 className="text-4xl font-black mb-10 text-yellow-400 tracking-tighter">SNAPIFY</h1>
+                    <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
+                        {!isLogin && <input className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-800 outline-none focus:border-yellow-400" placeholder="Username" onChange={e => setForm({...form, username: e.target.value})} required />}
+                        <input className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-800 outline-none focus:border-yellow-400" placeholder="Email or Username" onChange={e => setForm({...form, email: e.target.value})} required />
+                        <input type="password" auto-complete="current-password" className="w-full p-4 rounded-2xl bg-zinc-900 border border-zinc-800 outline-none focus:border-yellow-400" placeholder="Password" onChange={e => setForm({...form, password: e.target.value})} required />
+                        <button type="submit" className="w-full p-4 rounded-2xl snap-yellow font-bold text-lg active:scale-95 transition">{isLogin ? "Log In" : "Sign Up"}</button>
+                    </form>
+                    <p className="mt-8 text-zinc-500 cursor-pointer" onClick={() => setIsLogin(!isLogin)}>
+                        {isLogin ? "New here? Create Account" : "Already have account? Login"}
+                    </p>
+                </div>
+            );
         }
 
-        function sendMessage() {
-            const content = document.getElementById('msgInput').value;
-            const userId = document.getElementById('userId').value.trim();
-            const receiverId = document.getElementById('receiverId').value.trim();
-            const convId = document.getElementById('convId').value.trim();
-            const msgId = "msg-" + Date.now();
+        function ChatList({ token, user, socketInstance }) {
+            const [chats, setChats] = useState([]);
+            const [openChat, setOpenChat] = useState(null);
 
-            if (!content || !socket || !receiverId) return alert("Receiver Name bharo!");
+            useEffect(() => {
+                axios.get(API_BASE + "/chats", { headers: { Authorization: `Bearer ${token}` }})
+                    .then(res => setChats(res.data.data))
+                    .catch(() => setChats([]));
+            }, [token]);
 
-            socket.emit('new_message', { 
-                conversationId: convId, senderId: userId, content: content, receiverId: receiverId, messageId: msgId
-            });
+            if (openChat) return <ChatWindow chat={openChat} token={token} user={user} socketInstance={socketInstance} back={() => setOpenChat(null)} />;
 
-            showMsg('Me', content, 'me', msgId);
-            document.getElementById('msgInput').value = '';
+            return (
+                <div className="bg-white text-black h-full rounded-t-[2.5rem] p-5 shadow-inner">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-black">Chat</h2>
+                        <i data-lucide="message-square-plus" className="text-zinc-400"></i>
+                    </div>
+                    {chats.map(chat => {
+                        const friend = chat.participants?.find(p => p.id !== user.id) || { username: 'Friend' };
+                        return (
+                            <div key={chat.id} onClick={() => setOpenChat(chat)} className="flex items-center gap-4 py-4 border-b border-zinc-50 active:bg-zinc-50 cursor-pointer">
+                                <div className="w-14 h-14 rounded-2xl bg-zinc-100 flex items-center justify-center font-bold text-zinc-400 uppercase text-xl">
+                                    {friend.username[0]}
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-lg">{friend.username}</h4>
+                                    <p className="text-sm text-blue-500 font-medium">New Snap • Now</p>
+                                </div>
+                                <div className="text-orange-500 font-bold italic">{chat.streak || 0} 🔥</div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
         }
 
-        function sendGroupMessage() {
-            const content = document.getElementById('msgInput').value;
-            const groupId = document.getElementById('convId').value.trim();
-            const userId = document.getElementById('userId').value.trim();
-            const msgId = "msg-" + Date.now();
+        function ChatWindow({ chat, token, user, socketInstance, back }) {
+            const [msgs, setMsgs] = useState([]);
+            const [input, setInput] = useState("");
+            const scrollRef = useRef();
+            const friend = chat.participants?.find(p => p.id !== user.id) || { username: 'Friend', id: '' };
 
-            if (!content || !socket || !groupId) return alert("Room ID bharo!");
+            useEffect(() => {
+                axios.get(`${API_BASE}/messages/${chat.id}`, { headers: { Authorization: `Bearer ${token}` }})
+                    .then(res => setMsgs(res.data.data));
+                
+                if (socketInstance) {
+                    socketInstance.emit('join_chat', chat.id);
+                    socketInstance.on('message_received', (data) => {
+                        if(data.conversationId === chat.id) setMsgs(prev => [...prev, data]);
+                    });
+                }
+            }, [chat.id, socketInstance, token]);
 
-            socket.emit('new_group_message', {
-                groupId: groupId, senderId: userId, senderName: userId, content: content, messageId: msgId
-            });
+            useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs]);
 
-            showMsg('Me', content, 'me', msgId);
-            document.getElementById('msgInput').value = '';
+            const send = () => {
+                if (!input || !socketInstance) return;
+                const payload = { 
+                    conversationId: chat.id, 
+                    senderId: user.id, 
+                    content: input, 
+                    receiverId: friend.id,
+                    messageId: "msg-" + Date.now()
+                };
+                socketInstance.emit('new_message', payload);
+                setMsgs(prev => [...prev, { ...payload, sender: { username: user.username } }]);
+                setInput("");
+            };
+
+            return (
+                <div className="fixed inset-0 bg-white text-black z-[100] flex flex-col max-w-md mx-auto">
+                    <div className="p-4 border-b flex items-center gap-4">
+                        <button onClick={back} className="p-2 hover:bg-zinc-100 rounded-full text-zinc-600"><i data-lucide="chevron-left"></i></button>
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 text-white flex items-center justify-center font-bold uppercase">{friend.username[0]}</div>
+                        <h3 className="font-bold text-lg">{friend.username}</h3>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-zinc-50">
+                        {msgs.map((m, i) => (
+                            <div key={i} className={`flex ${m.senderId === user.id ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`p-3 max-w-[80%] shadow-sm ${m.senderId === user.id ? 'msg-me text-white' : 'msg-other text-white'}`}>
+                                    {m.content}
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={scrollRef}></div>
+                    </div>
+                    <div className="p-4 flex gap-2 border-t bg-white items-center">
+                        <input className="flex-1 p-4 rounded-full bg-zinc-100 outline-none text-sm" placeholder="Send a chat" value={input} onChange={e => setInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && send()} />
+                        <button onClick={send} className="bg-blue-500 text-white p-4 rounded-full shadow-lg"><i data-lucide="send" className="w-5 h-5"></i></button>
+                    </div>
+                </div>
+            );
         }
 
-        function showMsg(sender, text, type, msgId) {
-            const div = document.createElement('div');
-            const idToUse = msgId || "msg-" + Date.now();
-            div.className = `msg ${type}`;
-            div.id = idToUse;
-            
-            div.addEventListener('dblclick', (e) => {
-                e.stopPropagation();
-                handleReaction(idToUse, '❤️');
-            });
+        function CameraView({ token, user }) {
+            const sendSnap = async () => {
+                const friendId = prompt("Enter Friend User ID:");
+                if(!friendId) return;
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.onchange = async () => {
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+                    formData.append('receiverId', friendId);
+                    formData.append('mediaType', 'IMAGE');
+                    try {
+                        await axios.post(API_BASE + "/snaps/send", formData, { headers: { Authorization: `Bearer ${token}` }});
+                        alert("Snap Sent! 🔥");
+                    } catch { alert("Failed to send"); }
+                };
+                fileInput.click();
+            };
 
-            div.innerHTML = `
-                <small style="display:block; font-size:10px; margin-bottom:3px; opacity:0.8;">${sender}</small>
-                ${text}
-                <div class="reaction-badge" id="react-${idToUse}"></div>
-            `;
-            
-            msgDiv.appendChild(div);
-            msgDiv.scrollTop = msgDiv.scrollHeight;
+            return (
+                <div className="h-full flex flex-col items-center justify-center bg-zinc-900 rounded-t-[3rem]">
+                    <div className="text-zinc-500 font-bold tracking-widest uppercase text-xs mb-20">Snap Camera</div>
+                    <button onClick={sendSnap} className="w-24 h-24 rounded-full border-8 border-white flex items-center justify-center active:scale-90 transition shadow-2xl">
+                        <div className="w-16 h-16 rounded-full bg-white shadow-inner"></div>
+                    </button>
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 flex flex-col gap-8 bg-black/30 p-4 rounded-full glass">
+                        <i data-lucide="rotate-ccw"></i>
+                        <i data-lucide="zap" className="text-yellow-400"></i>
+                        <i data-lucide="moon"></i>
+                        <i data-lucide="music"></i>
+                    </div>
+                </div>
+            );
         }
 
-        function showSnapAlert(title, message) {
-            const layer = document.getElementById('notification-layer');
-            const notifyDiv = document.createElement('div');
-            Object.assign(notifyDiv.style, {
-                margin: "20px auto", width: "fit-content", backgroundColor: "#FFFC00",
-                padding: "10px 25px", borderRadius: "50px", border: "3px solid black",
-                fontWeight: "bold", textAlign: "center", boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
-                pointerEvents: "auto"
-            });
-            notifyDiv.innerHTML = `👻 ${title}: ${message}`;
-            layer.appendChild(notifyDiv);
-            setTimeout(() => notifyDiv.remove(), 4000);
+        function Stories({ token }) {
+            const [feed, setFeed] = useState([]);
+            useEffect(() => {
+                axios.get(API_BASE + "/stories/feed", { headers: { Authorization: `Bearer ${token}` }})
+                    .then(res => setFeed(res.data.data)).catch(() => setFeed([]));
+            }, [token]);
+
+            return (
+                <div className="p-5">
+                    <h2 className="text-3xl font-black mb-6">Stories</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                        {feed.map(story => (
+                            <div key={story.id} className="h-72 rounded-[2rem] bg-zinc-800 overflow-hidden relative border border-zinc-700 shadow-xl">
+                                <img src={story.url} className="w-full h-full object-cover opacity-80" />
+                                <div className="absolute bottom-4 left-4 flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-yellow-400 border border-black"></div>
+                                    <span className="text-xs font-bold">{story.author?.username}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {feed.length === 0 && <p className="text-center text-zinc-600 mt-20 italic">No active stories</p>}
+                </div>
+            );
         }
+
+        function Profile({ user, setUser, setToken }) {
+            const logout = () => { localStorage.clear(); setToken(null); setUser(null); };
+            return (
+                <div className="p-8 text-center animate-pop">
+                    <div className="w-36 h-36 rounded-[2.5rem] bg-zinc-800 border-4 border-yellow-400 mx-auto flex items-center justify-center text-5xl font-black mb-6 text-yellow-400 shadow-2xl">
+                        {user?.username?.[0].toUpperCase()}
+                    </div>
+                    <h1 className="text-4xl font-black mb-1">{user?.username}</h1>
+                    <p className="text-zinc-500 mb-10 font-medium">{user?.email}</p>
+                    
+                    <div className="flex justify-center gap-8 mb-10 bg-zinc-900 p-6 rounded-[2rem] border border-zinc-800 shadow-xl">
+                        <div><p className="text-2xl font-black text-yellow-400">{user?.score || 0}</p><p className="text-[10px] uppercase font-bold text-zinc-500">Score</p></div>
+                        <div className="w-[1px] bg-zinc-800"></div>
+                        <div><p className="text-2xl font-black text-orange-500">{user?.streak || 0} 🔥</p><p className="text-[10px] uppercase font-bold text-zinc-500">Streak</p></div>
+                    </div>
+
+                    <button onClick={logout} className="w-full p-5 bg-red-500/10 text-red-500 rounded-[1.5rem] font-black uppercase text-xs hover:bg-red-500 hover:text-white transition">Log Out</button>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

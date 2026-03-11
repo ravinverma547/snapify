@@ -84,3 +84,30 @@ export const searchUsers = async (req: any, res: Response) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// 4. Get specific user profile
+export const getUserProfile = async (req: any, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true,
+        score: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User nahi mila" });
+    }
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

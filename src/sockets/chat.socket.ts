@@ -76,4 +76,38 @@ export const chatHandler = (io: Server, socket: Socket) => {
 
     console.log(`❤️ Reaction: ${userId} ${actionType} ${emoji} on ${messageId} in room ${cleanRoomId}`);
   });
+
+  // 📞 6. WebRTC CALLING LOGIC (Signaling Handshake)
+  
+  // A initiate call kar raha hai B ko
+  socket.on("call_user", (data: { to: string; from: any; type: 'VOICE' | 'VIDEO'; roomId: string }) => {
+    const { to, from, type, roomId } = data;
+    if (!to) return;
+    console.log(`📞 Call Request: ${from.username} -> ${to} (${type})`);
+    io.to(to.toString()).emit("incoming_call", { from, type, roomId });
+  });
+
+  // B call accept ya reject kar raha hai
+  socket.on("call_response", (data: { to: string; fromId: string; accepted: boolean; roomId: string }) => {
+    const { to, accepted, roomId } = data;
+    if (!to) return;
+    console.log(`📞 Call Response: To ${to} -> Accepted: ${accepted}`);
+    io.to(to.toString()).emit("call_answered", { accepted, roomId });
+  });
+
+  // WebRTC Signaling Data (Offer, Answer, ICE Candidates) relay karna
+  socket.on("webrtc_signal", (data: { to: string; signal: any; roomId: string }) => {
+    const { to, signal, roomId } = data;
+    if (!to) return;
+    // Bhejne wala A hai, milne wala B (signal can be Offer/Answer/ICE)
+    io.to(to.toString()).emit("webrtc_signal_received", { signal, fromId: socket.id, roomId });
+  });
+
+  // Call End karna
+  socket.on("end_call", (data: { to: string; roomId: string }) => {
+    const { to, roomId } = data;
+    if (!to) return;
+    console.log(`📞 Call Ended in room ${roomId}`);
+    io.to(to.toString()).emit("call_ended", { roomId });
+  });
 };

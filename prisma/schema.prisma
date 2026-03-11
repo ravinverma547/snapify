@@ -119,33 +119,36 @@ model StoryView {
 }
 
 model Conversation {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  isGroup   Boolean  @default(false)
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  isGroup        Boolean  @default(false)
+  name           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  messages Message[]
+  messages       Message[]
 
   participantIds String[] @db.ObjectId
   participants   User[]   @relation(fields: [participantIds], references: [id])
+
+  adminIds       String[] @db.ObjectId
 }
 
 model Message {
-  id             String      @id @default(auto()) @map("_id") @db.ObjectId
-  content        String?
-  mediaUrl       String?
-  type           MessageType @default(TEXT)
-  createdAt      DateTime    @default(now())
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  content         String?
+  mediaUrl        String?
+  type            MessageType @default(TEXT)
+  isSystemMessage Boolean     @default(false)
+  createdAt       DateTime    @default(now())
 
-  sender         User   @relation("MessageSender", fields: [senderId], references: [id])
-  senderId       String @db.ObjectId
+  sender          User   @relation("MessageSender", fields: [senderId], references: [id])
+  senderId        String @db.ObjectId
 
-  conversation   Conversation @relation(fields: [conversationId], references: [id])
-  conversationId String       @db.ObjectId
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+  conversationId  String       @db.ObjectId
 
-  reactions      Reaction[] @relation("MessageReactions")
-  isSavedBy      String[] @db.ObjectId
+  reactions       Reaction[] @relation("MessageReactions")
+  isSavedBy       String[]   @db.ObjectId
 }
 
 model Reaction {

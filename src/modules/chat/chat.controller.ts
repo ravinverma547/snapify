@@ -62,7 +62,55 @@ export class ChatController {
         orderBy: { updatedAt: 'desc' }
       });
 
+      // Ensure My AI chat exists in my list
+      try {
+        const aiUser = await prisma.user.findUnique({ where: { username: "my_ai" } });
+        if (aiUser && aiUser.id !== myId) {
+          const hasAiChat = chats.some(c => !c.isGroup && c.participantIds.includes(aiUser.id));
+          if (!hasAiChat) {
+             const newAiChat = await prisma.conversation.create({
+                data: {
+                  isGroup: false,
+                  participantIds: [myId!, aiUser.id]
+                },
+                include: {
+                  participants: { select: { id: true, username: true, avatarUrl: true } },
+                  messages: { take: 1, orderBy: { createdAt: 'desc' } }
+                }
+             });
+             chats.unshift(newAiChat);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to inject My AI chat:", e);
+      }
+
       res.status(200).json({ success: true, data: chats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 3. Poori Chat (1-on-1) delete karna
+  async deleteChat(req: AuthRequest, res: Response) {
+    try {
+      const chatId = req.params.chatId as string;
+      const myId = req.user?.id;
+
+      const chat = await prisma.conversation.findUnique({ where: { id: chatId } });
+      if (!chat) return res.status(404).json({ success: false, message: "Chat nahi mili" });
+      if (chat.isGroup) return res.status(400).json({ success: false, message: "Ye group chat hai, isse group settings se delete karein" });
+      if (!chat.participantIds.includes(myId!)) return res.status(403).json({ success: false, message: "Aap is chat ka hissa nahi hain" });
+
+      const messages = await prisma.message.findMany({ where: { conversationId: chatId }});
+      const messageIds = messages.map(m => m.id);
+
+      await prisma.reaction.deleteMany({ where: { messageId: { in: messageIds } } });
+      await prisma.message.deleteMany({ where: { conversationId: chatId } });
+      
+      await prisma.conversation.delete({ where: { id: chatId } });
+
+      res.status(200).json({ success: true, message: "Chat delete ho gayi" });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

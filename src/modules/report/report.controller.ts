@@ -90,4 +90,4 @@ export class ReportController {
       res.status(500).json({ success: false, message: error.message });
     }
   }
-} // <--- Ye wala bracket zaroori tha class ko band karne ke liye
+} 
