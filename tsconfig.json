@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "exclude": ["node_modules", "dist", "prisma.config.ts"]
+  "exclude": ["node_modules", "dist", "prisma.config.ts", "test.ts", "src/verify_schema.ts"]
 }
