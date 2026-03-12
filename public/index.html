@@ -2563,38 +2563,34 @@
       if (socket) return;
       socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
       socket.on('connect', () => { if (currentUser?.id) socket.emit('setup', currentUser.id); });
+      const normalizeId = (id) => id?.toString().trim().replace(/['"]+/g, '');
+
       socket.on('message_received', (data) => {
-        // Refresh chat list to show unread or latest message
         loadChatList();
+        const cid = normalizeId(currentConversationId);
+        const incomingId = normalizeId(data.roomId || data.conversationId);
         
-        // If chat window open for this room, append message instantly
-        const actualRoomId = data.roomId || data.conversationId;
-        if (currentConversationId && actualRoomId === currentConversationId) {
+        if (cid && incomingId === cid) {
           appendSingleMessage(data);
         } else {
-          toast(`💬 New message from ${data.sender?.displayName || 'Friend'}`, 'info');
+          toast(`💬 New message!`, 'info');
         }
       });
-      socket.on('group_message_received', (data) => {
-        loadChatList();
-        if (currentConversationId && data.roomId === currentConversationId) {
-          appendSingleMessage(data);
-        }
-      });
-      socket.on('new_group_message', (data) => {
-        loadChatList();
-        if (currentConversationId && data.roomId === currentConversationId) {
-          appendSingleMessage(data);
-        }
-      });
+
       socket.on('typing_status', (data) => {
         const indicator = document.getElementById('typing-indicator');
         const text = document.getElementById('typing-text');
-        if (currentChatPartner?.id === data.senderId) {
+        const cid = normalizeId(currentConversationId);
+        
+        // Match by room if available, otherwise fallback to senderId (for 1-on-1)
+        const isFromActiveChat = (data.roomId && normalizeId(data.roomId) === cid) || 
+                                (currentChatPartner?.id === data.senderId);
+
+        if (isFromActiveChat) {
           indicator.style.display = data.isTyping ? 'block' : 'none';
-          text.textContent = `${currentChatPartner.displayName || 'Friend'} is typing...`;
+          text.textContent = `${data.sender?.displayName || currentChatPartner?.displayName || 'Someone'} is typing...`;
           const el = document.getElementById('chat-messages');
-          el.scrollTop = el.scrollHeight;
+          if (el) el.scrollTop = el.scrollHeight;
         }
       });
       socket.on('reaction_updated', () => {
@@ -4001,7 +3997,8 @@
             };
             socket.emit(isCurrentChatGroup ? 'new_group_message' : 'new_message', {
                ...payload,
-               receiverId: isCurrentChatGroup ? null : currentChatPartner?.id
+               receiverId: isCurrentChatGroup ? null : currentChatPartner?.id,
+               roomId: currentConversationId // Ensure roomId is passed properly
             });
           }
         } else {

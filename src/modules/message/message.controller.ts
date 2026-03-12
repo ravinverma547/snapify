@@ -113,7 +113,7 @@ export class MessageController {
             console.log(`🤖 My AI Response cycle started...`);
             const io = req.app.get("io");
             if (io) {
-               io.to(senderId!).emit("typing_status", { senderId: aiUser.id, isTyping: true });
+               io.to(conversationId as string).emit("typing_status", { senderId: aiUser.id, isTyping: true });
             }
 
             const responseText = await getAIResponse(content);
@@ -134,16 +134,17 @@ export class MessageController {
             });
 
             if (io) {
-              const cleanSenderId = senderId!.toString();
-              io.to(cleanSenderId).emit("message_received", {
+              const cleanRoomId = conversationId as string;
+              // Emit to the conversation room so both user and AI message appear instantly
+              io.to(cleanRoomId).emit("message_received", {
                  senderId: aiUser.id,
                  content: responseText,
-                 receiverId: cleanSenderId,
+                 roomId: cleanRoomId,
                  messageId: aiMessage.id,
-                 conversationId: conversationId as string // Crucial for live update
+                 sender: { id: aiUser.id, username: aiUser.username, avatarUrl: aiUser.avatarUrl }
               });
-              io.to(cleanSenderId).emit("typing_status", { senderId: aiUser.id, isTyping: false });
-              console.log(`🤖 Real-time response sent to ${cleanSenderId}`);
+              io.to(cleanRoomId).emit("typing_status", { senderId: aiUser.id, isTyping: false });
+              console.log(`🤖 AI response emitted to room ${cleanRoomId}`);
             }
           } catch (aiErr) {
             console.error("❌ My AI Error:", aiErr);
