@@ -432,7 +432,22 @@
       display: none;
       height: 100vh;
       flex-direction: column;
-      overflow: hidden
+      overflow: hidden;
+      max-width: 500px;
+      margin: 0 auto;
+      background: var(--bg);
+      position: relative;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    /* Desktop Background */
+    @media (min-width: 1024px) {
+      body {
+        background: linear-gradient(135deg, #0f0f18 0%, #1a1a25 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
     }
 
     /* ── TOP NAV ── */
@@ -2176,6 +2191,41 @@
 
   <!-- Chat Window -->
   <div id="chat-window">
+    <style>
+      #chat-window {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        z-index: 1000;
+        flex-direction: column;
+        display: flex;
+        transform: translateX(100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        max-width: 500px;
+        left: auto;
+        right: 0;
+      }
+      @media (min-width: 1024px) {
+        #chat-window {
+          left: 50%;
+          transform: translateX(100%);
+          margin-left: -250px; /* Offset to center if left was 0, but here we use translateX */
+        }
+        #chat-window.open {
+          transform: translateX(-100%); /* Slide into the 500px slot from the right */
+          left: 50%;
+          margin-left: 250px;
+        }
+      }
+      /* Simplified for mobile/default */
+      #chat-window { left: 0; transform: translateX(100%); }
+      #chat-window.open { transform: translateX(0); }
+      
+      @media (min-width: 1024px) {
+        #chat-window { left: 50%; margin-left: -250px; transform: translateX(100%); width: 500px; }
+        #chat-window.open { transform: translateX(0); }
+      }
+    </style>
     <div class="chat-win-header">
       <button class="chat-win-back" onclick="closeChatWindow()"><i class="fa fa-arrow-left"></i></button>
       <div id="chat-win-avatar" class="avatar" style="width:38px;height:38px;font-size:14px">?</div>
@@ -2517,11 +2567,17 @@
         // Refresh chat list to show unread or latest message
         loadChatList();
         
-        // If chat window open with this sender, reload messages
-        if (currentConversationId) {
-          loadChatMessages();
+        // If chat window open for this room, append message instantly
+        if (currentConversationId && (data.roomId === currentConversationId || data.conversationId === currentConversationId)) {
+          appendSingleMessage(data);
         } else {
-          toast('💬 New message!', 'info');
+          toast(`💬 New message from ${data.sender?.displayName || 'Friend'}`, 'info');
+        }
+      });
+      socket.on('new_group_message', (data) => {
+        loadChatList();
+        if (currentConversationId && data.roomId === currentConversationId) {
+          appendSingleMessage(data);
         }
       });
       socket.on('typing_status', (data) => {
@@ -3736,53 +3792,65 @@
       const el = document.getElementById('chat-messages');
       if (!ok || !messages?.length) { el.innerHTML = '<div class="empty-state"><i class="fa fa-comments"></i><p>Say hello! 👋</p></div>'; return; }
       
-      el.innerHTML = messages.map(m => {
-        if (m.isSystemMessage) {
-           return `<div class="msg-row" style="justify-content:center;" id="msg-${m.id}">
-             <div style="background:var(--surface2); color:var(--text2); font-size:12px; padding:4px 12px; border-radius:12px; margin: 10px 0;">
-               ${m.content}
-             </div>
-           </div>`;
-        }
+      el.innerHTML = messages.map(m => createMessageHTML(m, myId)).join('');
+      el.scrollTop = el.scrollHeight;
+    }
 
-        const isMine = m.senderId === myId;
-        const rxns = m.reactions || [];
-        // Group by emoji
-        const grouped = {};
-        let myEmoji = null;
-        rxns.forEach(r => {
-          if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, time: r.createdAt, mine: false };
-          grouped[r.emoji].count++;
-          if (r.userId === myId) { grouped[r.emoji].mine = true; myEmoji = r.emoji; }
-        });
-        const rxnHTML = Object.entries(grouped).map(([e, g]) => {
-          const sel = g.mine ? 'background:#FFFC0035;border-color:#FFFC00;color:#FFFC00;font-weight:700;' : '';
-          const tip = g.mine ? `You reacted • ${timeAgo(g.time)}` : `${g.count} reaction${g.count > 1 ? 's' : ''} • ${timeAgo(g.time)}`;
-          return `<span class="msg-reaction-badge" style="${sel}" title="${tip}" onclick="event.stopPropagation();reactToMessage('${m.id}','${e}')">${e}${g.count > 1 ? ' ' + g.count : ''}</span>`;
-        }).join('');
+    function createMessageHTML(m, myId) {
+      if (m.isSystemMessage) {
+         return `<div class="msg-row" style="justify-content:center;" id="msg-${m.id}">
+           <div style="background:var(--surface2); color:var(--text2); font-size:12px; padding:4px 12px; border-radius:12px; margin: 10px 0;">
+             ${m.content}
+           </div>
+         </div>`;
+      }
 
-        let contentHtml = m.content || '';
-        if (m.mediaUrl) {
-           if (m.type === 'IMAGE') contentHtml = `<img src="${m.mediaUrl}" style="max-width:200px;border-radius:12px;display:block;margin-bottom:4px" onclick="event.stopPropagation(); window.open('${m.mediaUrl}','_blank')"/>`;
-           else if (m.type === 'VIDEO') contentHtml = `<video src="${m.mediaUrl}" controls style="max-width:200px;border-radius:12px;display:block;margin-bottom:4px" onclick="event.stopPropagation()"></video>`;
-           else if (m.type === 'AUDIO') contentHtml = `<div style="display:flex;align-items:center;gap:8px;padding:4px"><i class="fa fa-play-circle" style="font-size:24px"></i><audio src="${m.mediaUrl}" controls style="height:32px;filter:invert(1)"></audio></div>`;
-        }
-
-        return `<div class="msg-row ${isMine ? 'mine' : ''}" id="msg-${m.id}">
-      <div style="display:flex; flex-direction:column; align-items: ${isMine ? 'flex-end' : 'flex-start'}">
-        ${isCurrentChatGroup && !isMine ? `<div style="font-size:11px; color:var(--text3); margin-bottom:2px; margin-left:12px;">${m.sender?.displayName || m.sender?.username || 'Unknown'}</div>` : ''}
-        <div class="msg-bubble ${isMine ? 'mine' : 'theirs'}" onclick="toggleEmojiPicker('${m.id}')" style="position:relative">
-          <div>${contentHtml}</div>
-          <div class="msg-time">${timeAgo(m.createdAt)}</div>
-          <div class="emoji-picker" id="ep-${m.id}" style="display:none;position:absolute;${isMine ? 'right:0' : 'left:0'};bottom:calc(100% + 4px);">
-            ${['❤️', '😂', '😮', '😢', '🔥', '👍'].map(e => `<span onclick="event.stopPropagation();reactToMessage('${m.id}','${e}')" style="${e === myEmoji ? 'background:var(--surface3);border-radius:6px;' : ''}">${e}</span>`).join('')}
-            ${isMine ? `<span onclick="event.stopPropagation();unsendMessage('${m.id}')" style="margin-left:4px;color:#ef4444;" title="Unsend"><i class="fa fa-trash"></i></span>` : ''}
-          </div>
-        </div>
-        ${rxnHTML ? `<div class="msg-reactions" style="${isMine ? 'justify-content:flex-end' : ''};padding:2px 4px">${rxnHTML}</div>` : ''}
-      </div>
-    </div>`;
+      const isMine = m.senderId === myId;
+      const rxns = m.reactions || [];
+      // Group by emoji
+      const grouped = {};
+      let myEmoji = null;
+      rxns.forEach(r => {
+        if (!grouped[r.emoji]) grouped[r.emoji] = { count: 0, time: r.createdAt, mine: false };
+        grouped[r.emoji].count++;
+        if (r.userId === myId) { grouped[r.emoji].mine = true; myEmoji = r.emoji; }
+      });
+      const rxnHTML = Object.entries(grouped).map(([e, g]) => {
+        const sel = g.mine ? 'background:#FFFC0035;border-color:#FFFC00;color:#FFFC00;font-weight:700;' : '';
+        const tip = g.mine ? `You reacted • ${timeAgo(g.time)}` : `${g.count} reaction${g.count > 1 ? 's' : ''} • ${timeAgo(g.time)}`;
+        return `<span class="msg-reaction-badge" style="${sel}" title="${tip}" onclick="event.stopPropagation();reactToMessage('${m.id}','${e}')">${e}${g.count > 1 ? ' ' + g.count : ''}</span>`;
       }).join('');
+
+      let contentHtml = m.content || '';
+      if (m.mediaUrl) {
+         if (m.type === 'IMAGE') contentHtml = `<img src="${m.mediaUrl}" style="max-width:200px;border-radius:12px;display:block;margin-bottom:4px" onclick="event.stopPropagation(); window.open('${m.mediaUrl}','_blank')"/>`;
+         else if (m.type === 'VIDEO') contentHtml = `<video src="${m.mediaUrl}" controls style="max-width:200px;border-radius:12px;display:block;margin-bottom:4px" onclick="event.stopPropagation()"></video>`;
+         else if (m.type === 'AUDIO') contentHtml = `<div style="display:flex;align-items:center;gap:8px;padding:4px"><i class="fa fa-play-circle" style="font-size:24px"></i><audio src="${m.mediaUrl}" controls style="height:32px;filter:invert(1)"></audio></div>`;
+      }
+
+      return `<div class="msg-row ${isMine ? 'mine' : ''}" id="msg-${m.id}">
+    <div style="display:flex; flex-direction:column; align-items: ${isMine ? 'flex-end' : 'flex-start'}">
+      ${isCurrentChatGroup && !isMine ? `<div style="font-size:11px; color:var(--text3); margin-bottom:2px; margin-left:12px;">${m.sender?.displayName || m.sender?.username || 'Unknown'}</div>` : ''}
+      <div class="msg-bubble ${isMine ? 'mine' : 'theirs'}" onclick="toggleEmojiPicker('${m.id}')" style="position:relative">
+        <div>${contentHtml}</div>
+        <div class="msg-time">${timeAgo(m.createdAt)}</div>
+        <div class="emoji-picker" id="ep-${m.id}" style="display:none;position:absolute;${isMine ? 'right:0' : 'left:0'};bottom:calc(100% + 4px);">
+          ${['❤️', '😂', '😮', '😢', '🔥', '👍'].map(e => `<span onclick="event.stopPropagation();reactToMessage('${m.id}','${e}')" style="${e === myEmoji ? 'background:var(--surface3);border-radius:6px;' : ''}">${e}</span>`).join('')}
+          ${isMine ? `<span onclick="event.stopPropagation();unsendMessage('${m.id}')" style="margin-left:4px;color:#ef4444;" title="Unsend"><i class="fa fa-trash"></i></span>` : ''}
+        </div>
+      </div>
+      ${rxnHTML ? `<div class="msg-reactions" style="${isMine ? 'justify-content:flex-end' : ''};padding:2px 4px">${rxnHTML}</div>` : ''}
+    </div>
+  </div>`;
+    }
+
+    function appendSingleMessage(m) {
+      const el = document.getElementById('chat-messages');
+      if (el.querySelector('.empty-state')) el.innerHTML = '';
+      const myId = currentUser?.id || JSON.parse(localStorage.getItem('snapify_user') || '{}').id;
+      // Prevent duplicates
+      if (document.getElementById(`msg-${m.id || m.messageId}`)) return;
+      el.insertAdjacentHTML('beforeend', createMessageHTML(m, myId));
       el.scrollTop = el.scrollHeight;
     }
 
@@ -3843,12 +3911,25 @@
       if (!isRecording) {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          mediaRecorder = new MediaRecorder(stream);
+          
+          // Determine best supported MIME type for mobile (iOS/Android)
+          let mimeType = 'audio/webm';
+          if (!MediaRecorder.isTypeSupported(mimeType)) {
+            mimeType = 'audio/mp4';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+              mimeType = 'audio/ogg';
+              if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = ''; // Let browser decide
+            }
+          }
+
+          mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
           audioChunks = [];
-          mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+          mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
           mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            sendChatFile(audioBlob, 'AUDIO');
+            const finalType = mediaRecorder.mimeType || 'audio/webm';
+            const audioBlob = new Blob(audioChunks, { type: finalType });
+            const ext = finalType.includes('mp4') ? 'm4a' : finalType.includes('ogg') ? 'ogg' : 'webm';
+            sendChatFile(audioBlob, 'AUDIO', `voice.${ext}`);
             stream.getTracks().forEach(track => track.stop());
           };
           mediaRecorder.start();
@@ -3880,13 +3961,13 @@
       }
     }
 
-    async function sendChatFile(file, type) {
+    async function sendChatFile(file, type, fileName = '') {
       if (!currentConversationId) return;
       const formData = new FormData();
       formData.append('conversationId', currentConversationId);
       formData.append('type', type);
       if (type === 'AUDIO') {
-        formData.append('file', file, 'voice.webm');
+        formData.append('file', file, fileName || 'voice.webm');
       } else {
         formData.append('file', file);
       }
@@ -3901,7 +3982,7 @@
         });
         const data = await r.json();
         if (r.ok) {
-          loadChatMessages();
+          appendSingleMessage(data.data);
           if (socket) {
             const payload = {
               senderId: currentUser?.id,
@@ -3931,7 +4012,7 @@
       input.value = '';
       const { ok, data } = await api('POST', '/messages/send', { conversationId: currentConversationId, content, type: 'TEXT' });
       if (ok) {
-        loadChatMessages();
+        appendSingleMessage(data.data);
         if (socket) {
           if (isCurrentChatGroup) {
             socket.emit('new_group_message', {
