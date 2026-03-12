@@ -21,8 +21,23 @@ import streakRoutes from "./modules/streak/streak.routes";
 const app = express();
 
 // 1. Middlewares
+const allowedOrigins = [
+  "https://snapify-eight-zeta.vercel.app",
+  "https://snapifyy.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:5001"
+];
+
 app.use(cors({
-  origin: "*",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());

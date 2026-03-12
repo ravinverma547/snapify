@@ -18,7 +18,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   pingTimeout: 60000,
   cors: {
-    origin: "*",
+    origin: ["https://snapify-eight-zeta.vercel.app", "https://snapifyy.vercel.app", "http://localhost:5173"],
     methods: ["GET", "POST"],
     credentials: true
   },
