@@ -21,7 +21,16 @@ import streakRoutes from "./modules/streak/streak.routes";
 const app = express();
 
 // 1. Middlewares
-app.use(cors());
+// app.use(cors());
+// app.use(cors({
+//   origin: "https://snapifyy.vercel.app",
+//   credentials: true
+// }));
+app.use(cors({
+  origin: "https://snapifyy.vercel.app",
+  credentials: true,
+  methods: ["GET","POST","PUT","DELETE"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle karne ke liye
 

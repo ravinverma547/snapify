@@ -42,7 +42,8 @@ io.on("connection", (socket) => {
 });
 
 server.listen(PORT, async () => {
-  console.log(`🚀 Server chalu ho gaya hai: http://localhost:${PORT}`);
+  // console.log(`🚀 Server chalu ho gaya hai: http://localhost:${PORT}`);
+  console.log(`🚀 Server running successfully: https://snapify-backend-o0yt.onrender.com/${PORT}`);
   
   // Create or Update 'My AI' user
   try {
