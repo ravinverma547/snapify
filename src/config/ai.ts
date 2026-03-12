@@ -4,14 +4,18 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Initialize AI Clients
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Initialize AI Clients (Lazy initialization to prevent crashes if keys are missing)
+let groq: any = null;
+if (process.env.GROQ_API_KEY) {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
+
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
 
 export const getAIResponse = async (prompt: string) => {
   try {
     // 1. Try Groq (Sabse fast aur reliable filter)
-    if (process.env.GROQ_API_KEY) {
+    if (groq) {
       console.log(`⚡ Groq AI call for: "${prompt.substring(0, 40)}..."`);
       const completion = await groq.chat.completions.create({
         messages: [
@@ -34,6 +38,8 @@ export const getAIResponse = async (prompt: string) => {
     }
 
     // 2. Fallback to Gemini if Groq fails or no key
+    if (!genAI) throw new Error("No AI providers configured (Missing API Keys)");
+
     console.log("🔄 Falling back to Gemini...");
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
