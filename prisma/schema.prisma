@@ -2,7 +2,11 @@ datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
+<<<<<<< HEAD
 // prisma generate karne ke baad, aapko apne database mein collections aur indexes create karne ke liye `prisma db push` command chalana hoga. Yeh command aapke schema ke hisaab se database ko update karega.
+=======
+
+>>>>>>> eab5e3951f1fc5835a809487a31cc0776e4cdef9
 generator client {
   provider = "prisma-client-js"
 }
