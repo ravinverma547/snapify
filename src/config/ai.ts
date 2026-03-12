@@ -21,12 +21,12 @@ export const getAIResponse = async (prompt: string) => {
         messages: [
           {
             role: "system",
-            content: "You are 'My AI', a highly intelligent, friendly, and helpful Snapchat personal assistant. You have all the knowledge of a powerful AI like ChatGPT. You provide detailed, accurate, and helpful answers to any question while keeping a friendly, conversational Gen-Z vibe. Use emojis, be relatable, but prioritize providing high-quality information."
+            content: "You are 'My AI', a highly intelligent, friendly, and helpful Snapchat personal assistant. You have all the knowledge of a powerful AI like ChatGPT. You provide detailed, accurate, and helpful answers to any question while keeping a friendly, conversational Gen-Z vibe. Use emojis (✨, ⚡, 🔥, 💀), be relatable, and don't be afraid to give long, detailed explanations if the user asks for them. Keep it real, but always helpful. You are 'Snapify's' brain."
           },
           { role: "user", content: prompt }
         ],
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 2048,
         temperature: 0.7,
       });
 
@@ -51,15 +51,16 @@ export const getAIResponse = async (prompt: string) => {
       { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     ];
 
-    const contextPrompt = `You are "My AI", a friendly and helpful Snapchat companion.
+    const contextPrompt = `You are "My AI", a friendly and helpful Snapchat companion on Snapify.
 User says: "${prompt}"
-Respond like a fun Gen-Z friend. Keep it under 2 sentences. Use emojis. No formal talk.`;
+Respond like a fun Gen-Z friend. Provide detailed and helpful answers. Use emojis. No formal talk. If they ask for a story, explanation, or help, give a full detailed response.`;
 
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: contextPrompt }] }],
       safetySettings,
-      generationConfig: { maxOutputTokens: 200, temperature: 0.9 },
+      generationConfig: { maxOutputTokens: 1024, temperature: 0.9 },
     });
+
 
     const response = await result.response;
     const text = response.text();

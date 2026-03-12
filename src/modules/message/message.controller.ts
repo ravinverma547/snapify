@@ -180,7 +180,8 @@ export class MessageController {
               username: true, 
               avatarUrl: true 
             } 
-          }
+          },
+          reactions: true
         },
         orderBy: { 
           createdAt: 'asc' // Purani pehle, nayi baad mein
