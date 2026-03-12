@@ -429,15 +429,12 @@
 
     /* ── MAIN APP ── */
     #main-app {
-      display: none;
+      display: none; /* Initial state: Hidden */
       height: 100vh;
       width: 100%;
-      max-width: 500px;
-      margin: 0 auto;
       background: var(--bg);
       position: relative;
       box-shadow: 0 0 40px rgba(0,0,0,0.8);
-      display: flex;
       flex-direction: column;
       overflow: hidden;
     }
@@ -451,6 +448,10 @@
         justify-content: center;
         min-height: 100vh;
         overflow: hidden;
+      }
+      #main-app, #auth-screen {
+        max-width: 100%; /* Go full screen as requested */
+        border-radius: 0;
       }
     }
 
@@ -2422,10 +2423,14 @@
   <script>
     ////////////////////// CONFIG //////////////////////
     const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? window.location.origin
+        ? 'http://localhost:5001'
         : 'https://snapify-backend.onrender.com';
     const API = API_BASE + '/api/v1';
     const SOCKET_URL = API_BASE;
+    console.log('--- SNAPIFY CONFIG ---');
+    console.log('API_BASE:', API_BASE);
+    console.log('SOCKET_URL:', SOCKET_URL);
+    console.log('----------------------');
     let socket = null;
     let token = localStorage.getItem('snapify_token') || null;
     let currentUser = JSON.parse(localStorage.getItem('snapify_user') || 'null');
