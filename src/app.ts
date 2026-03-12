@@ -22,7 +22,7 @@ const app = express();
 
 // 1. Middlewares
 app.use(cors({
-  origin: ["https://snapifyy.vercel.app", "http://localhost:5173"],
+  origin: "*",
   credentials: true
 }));
 app.use(express.json());

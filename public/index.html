@@ -2551,7 +2551,13 @@
     ////////////////////// APP INIT //////////////////////
     function initSocket() {
       if (socket) return;
-      socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+      socket = io(SOCKET_URL, { 
+        transports: ['polling', 'websocket'],
+        upgrade: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000
+      });
       socket.on('connect', () => { if (currentUser?.id) socket.emit('setup', currentUser.id); });
       const normalizeId = (id) => id?.toString().trim().replace(/['"]+/g, '');
 
