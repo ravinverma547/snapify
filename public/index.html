@@ -2568,10 +2568,17 @@
         loadChatList();
         
         // If chat window open for this room, append message instantly
-        if (currentConversationId && (data.roomId === currentConversationId || data.conversationId === currentConversationId)) {
+        const actualRoomId = data.roomId || data.conversationId;
+        if (currentConversationId && actualRoomId === currentConversationId) {
           appendSingleMessage(data);
         } else {
           toast(`💬 New message from ${data.sender?.displayName || 'Friend'}`, 'info');
+        }
+      });
+      socket.on('group_message_received', (data) => {
+        loadChatList();
+        if (currentConversationId && data.roomId === currentConversationId) {
+          appendSingleMessage(data);
         }
       });
       socket.on('new_group_message', (data) => {
@@ -4026,6 +4033,7 @@
               senderId: currentUser?.id,
               content,
               receiverId: currentChatPartner.id,
+              roomId: currentConversationId,
               messageId: data?.data?.id
             });
           }

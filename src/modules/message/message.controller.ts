@@ -139,7 +139,8 @@ export class MessageController {
                  senderId: aiUser.id,
                  content: responseText,
                  receiverId: cleanSenderId,
-                 messageId: aiMessage.id
+                 messageId: aiMessage.id,
+                 conversationId: conversationId as string // Crucial for live update
               });
               io.to(cleanSenderId).emit("typing_status", { senderId: aiUser.id, isTyping: false });
               console.log(`🤖 Real-time response sent to ${cleanSenderId}`);

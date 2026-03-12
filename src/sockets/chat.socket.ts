@@ -29,7 +29,7 @@ export const chatHandler = (io: Server, socket: Socket) => {
     }
 
     // Us bande ki personal ID par message aur notification bhejo
-    io.to(cleanReceiverId).emit("message_received", { senderId, content, receiverId: cleanReceiverId, messageId });
+    io.to(cleanReceiverId).emit("message_received", { senderId, content, receiverId: cleanReceiverId, messageId, roomId: payload.roomId });
     io.to(cleanReceiverId).emit("notification_received", {
       title: `Private Snap from ${senderId}`,
       message: content,
@@ -48,7 +48,8 @@ export const chatHandler = (io: Server, socket: Socket) => {
       senderName,
       content,
       groupId: cleanGroupId,
-      messageId
+      messageId,
+      roomId: cleanGroupId // Add roomId for frontend consistency
     });
 
     socket.to(cleanGroupId).emit("notification_received", {
