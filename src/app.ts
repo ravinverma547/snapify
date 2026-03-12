@@ -32,22 +32,22 @@ app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle kar
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // 2. Routes Implementation
-const version = "/api/v1";
+const API_VERSION = "/api/v1";
 
-app.use(`${version}/auth`, authRoutes);
-app.use(`${version}/users`, userRoutes);
-app.use(`${version}/friends`, friendRoutes);
-app.use(`${version}/snaps`, snapRoutes);
-app.use(`${version}/stories`, storyRoutes);
-app.use(`${version}/chats`, chatRoutes);
-app.use(`${version}/groups`, groupRoutes);
-app.use(`${version}/messages`, messageRoutes);
-app.use(`${version}/notifications`, notificationRoutes);
-app.use(`${version}/score`, scoreRoutes);
-app.use(`${version}/reports`, reportRoutes);
-app.use(`${version}/blocks`, blockRoutes);
-app.use(`${version}/reactions`, reactionRoutes);
-app.use(`${version}/streaks`, streakRoutes);
+app.use(`${API_VERSION}/auth`, authRoutes);
+app.use(`${API_VERSION}/users`, userRoutes);
+app.use(`${API_VERSION}/friends`, friendRoutes);
+app.use(`${API_VERSION}/snaps`, snapRoutes);
+app.use(`${API_VERSION}/stories`, storyRoutes);
+app.use(`${API_VERSION}/chats`, chatRoutes);
+app.use(`${API_VERSION}/groups`, groupRoutes);
+app.use(`${API_VERSION}/messages`, messageRoutes);
+app.use(`${API_VERSION}/notifications`, notificationRoutes);
+app.use(`${API_VERSION}/score`, scoreRoutes);
+app.use(`${API_VERSION}/reports`, reportRoutes);
+app.use(`${API_VERSION}/blocks`, blockRoutes);
+app.use(`${API_VERSION}/reactions`, reactionRoutes);
+app.use(`${API_VERSION}/streaks`, streakRoutes);
 
 // 3. Health Check
 app.get("/", (_req, res) => {

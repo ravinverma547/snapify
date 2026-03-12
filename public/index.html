@@ -2471,9 +2471,17 @@
       if (token) opts.headers['Authorization'] = `Bearer ${token}`;
       if (body && !isFormData) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
       else if (body && isFormData) opts.body = body;
-      const r = await fetch(API + path, opts);
-      const data = await r.json();
-      return { ok: r.ok, status: r.status, data };
+      
+      const fullUrl = API + (path.startsWith('/') ? path : '/' + path);
+      try {
+        const r = await fetch(fullUrl, opts);
+        const data = await r.json();
+        if (!r.ok) console.error(`API Error [${r.status}] ${fullUrl}:`, data);
+        return { ok: r.ok, status: r.status, data };
+      } catch (err) {
+        console.error(`Fetch Failure ${fullUrl}:`, err);
+        return { ok: false, status: 0, data: { message: 'Network error' } };
+      }
     }
 
     function setLoading(btnId, loading) {
