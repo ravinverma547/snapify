@@ -61,6 +61,7 @@ app.get("/test-client", (_req, res) => {
 
 // 4. Global Error Handler (Optional but helpful)
 app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global Error Handler:", err);
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
     success: false,
