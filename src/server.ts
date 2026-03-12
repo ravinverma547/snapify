@@ -18,7 +18,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   pingTimeout: 60000,
   cors: {
-    origin: ["https://snapify-eight-zeta.vercel.app", "https://snapifyy.vercel.app", "http://localhost:5173"],
+    origin: true, // Mirror the Express app logic
     methods: ["GET", "POST"],
     credentials: true
   },
