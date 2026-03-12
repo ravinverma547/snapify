@@ -6,7 +6,8 @@ import app from "./app";
 import { chatHandler } from "./sockets/chat.socket";
 import prisma from "./config/prisma";
 import bcrypt from "bcrypt";
-import cron from "node-cron";
+import { storyCleanupJob } from "./jobs/storyCleanup";
+import { snapCleanupJob } from "./jobs/snapCleanup";
 
 const PORT = process.env.PORT || 5001;
 
@@ -66,19 +67,9 @@ server.listen(PORT, async () => {
     console.error("❌ Failed to initialize 'My AI':", error);
   }
 
-  // Story Cleanup Job (Har ghante chalega expired stories delete karne ke liye)
-  cron.schedule("0 * * * *", async () => {
-    try {
-      const deleted = await prisma.story.deleteMany({
-        where: { expiresAt: { lte: new Date() } }
-      });
-      if (deleted.count > 0) {
-        console.log(`🧹 Story Cleanup: ${deleted.count} expired stories deleted.`);
-      }
-    } catch (err) {
-      console.error("❌ Story Cleanup Error:", err);
-    }
-  });
+  // Background Jobs Initialization
+  storyCleanupJob();
+  snapCleanupJob();
 });
 
 process.on("SIGINT", async () => {
