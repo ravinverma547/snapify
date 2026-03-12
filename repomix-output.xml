@@ -1,0 +1,3380 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitignore
+package.json
+prisma.config.ts
+prisma/schema.prisma
+public/test-client.html
+README.md
+src/app.ts
+src/config/ai.ts
+src/config/aws.ts
+src/config/cloudinary.ts
+src/config/gcs.ts
+src/config/prisma.ts
+src/config/socket.ts
+src/index.ts
+src/jobs/snapCleanup.ts
+src/jobs/storyCleanup.ts
+src/middlewares/auth.middleware.ts
+src/middlewares/error.middleware.ts
+src/middlewares/rateLimit.middleware.ts
+src/middlewares/role.middleware.ts
+src/middlewares/upload.middleware.ts
+src/middlewares/validate.middleware.ts
+src/modules/admin/admin.controller.ts
+src/modules/admin/admin.routes.ts
+src/modules/ai/ai.controller.ts
+src/modules/ai/ai.routes.ts
+src/modules/ai/ai.service.ts
+src/modules/ai/ai.ts
+src/modules/auth/auth.controller.ts
+src/modules/auth/auth.routes.ts
+src/modules/auth/auth.schema.ts
+src/modules/auth/auth.service.ts
+src/modules/block/block.controller.ts
+src/modules/block/block.routes.ts
+src/modules/chat/chat.controller.ts
+src/modules/chat/chat.routes.ts
+src/modules/friend/friend.controller.ts
+src/modules/friend/friend.routes.ts
+src/modules/group/group.controller.ts
+src/modules/group/group.routes.ts
+src/modules/message/message.controller.ts
+src/modules/message/message.routes.ts
+src/modules/notification/notification.controller.ts
+src/modules/notification/notification.route.ts
+src/modules/reaction/reaction.controller.ts
+src/modules/reaction/reaction.routes.ts
+src/modules/report/report.controller.ts
+src/modules/report/report.routes.ts
+src/modules/score/score.controller.ts
+src/modules/score/score.routes.ts
+src/modules/snap/snap.controller.ts
+src/modules/snap/snap.routes.ts
+src/modules/story/story.controller.ts
+src/modules/story/story.routes.ts
+src/modules/streak/streak.controller.ts
+src/modules/streak/streak.routes.ts
+src/modules/user/user.controller.ts
+src/modules/user/user.routes.ts
+src/routes/index.ts
+src/server.ts
+src/sockets/chat.socket.ts
+src/sockets/notification.socket.ts
+src/types/index.d.ts
+src/uploads/upload.middleware.ts
+src/utils/ApiError.ts
+src/utils/ApiResponse.ts
+src/utils/generateToken.ts
+src/verify_schema.ts
+test.ts
+tools/socket-test.js
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path=".gitignore">
+node_modules
+# Keep environment variables out of version control
+.env
+
+/generated/prisma
+
+/src/generated/prisma
+</file>
+
+<file path="prisma.config.ts">
+module.exports = {
+  schema: 'prisma/schema.prisma',
+};
+</file>
+
+<file path="prisma/schema.prisma">
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+  // par agar aapka setup purana hai toh yahan url = env("DATABASE_URL") wapas daal sakte ho.
+
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String    @unique
+  username      String    @unique
+  displayName   String?
+  role          Role      @default(USER)
+  password      String
+  avatarUrl     String?
+  bitmojiData   String?
+  score         Int       @default(0)
+  streak        Int       @default(0)
+  lastActiveAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Snaps & Stories
+  sentSnaps     Snap[]    @relation("Sender")
+  receivedSnaps Snap[]    @relation("Receiver")
+  stories       Story[]
+  storyViews    StoryView[]
+
+  // Friends & Messages
+  friends       Friendship[] @relation("UserFriends")
+  friendOf      Friendship[] @relation("FriendUsers")
+  sentMessages  Message[]    @relation("MessageSender")
+  
+  // Reactions & Notifications
+  reactions     Reaction[]   @relation("UserReactions")
+  sentNotifications     Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationReceiver")
+
+  // Conversations
+  conversationIds String[]       @db.ObjectId
+  conversations   Conversation[] @relation(fields: [conversationIds], references: [id])
+
+  // --- Reports (Opposite Relations Fixed) ---
+  reportsSent     Report[] @relation("Reporter")
+  reportsReceived Report[] @relation("ReportedUser")
+}
+
+model Friendship {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+streak          Int              @default(0)
+  lastInteraction DateTime         @default(now())
+  
+    requester   User   @relation("UserFriends", fields: [requesterId], references: [id])
+  requesterId String @db.ObjectId
+
+  addressee   User   @relation("FriendUsers", fields: [addresseeId], references: [id])
+  addresseeId String @db.ObjectId
+
+
+  @@unique([requesterId, addresseeId])
+}
+
+model Snap {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  mediaType    MediaType
+  viewDuration Int        @default(10)
+  status       SnapStatus @default(SENT)
+  expiresAt    DateTime?
+  openedAt     DateTime?
+  createdAt    DateTime   @default(now())
+
+  sender       User   @relation("Sender", fields: [senderId], references: [id])
+  senderId     String @db.ObjectId
+
+  receiver     User   @relation("Receiver", fields: [receiverId], references: [id])
+  receiverId   String @db.ObjectId
+
+  // --- Relation Fixed ---
+  reports      Report[]
+}
+
+model Story {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  url       String
+  mediaType MediaType
+  expiresAt DateTime
+  privacy   StoryPrivacy @default(FRIENDS)
+  createdAt DateTime     @default(now())
+
+  author    User   @relation(fields: [authorId], references: [id])
+  authorId  String @db.ObjectId
+
+  views     StoryView[]
+
+  // --- Relation Fixed ---
+  reports   Report[]
+}
+
+model StoryView {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  viewedAt DateTime @default(now())
+
+  story    Story  @relation(fields: [storyId], references: [id])
+  storyId  String @db.ObjectId
+
+  viewer   User   @relation(fields: [viewerId], references: [id])
+  viewerId String @db.ObjectId
+
+  @@unique([storyId, viewerId])
+}
+
+model Conversation {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  isGroup   Boolean  @default(false)
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+
+  participantIds String[] @db.ObjectId
+  participants   User[]   @relation(fields: [participantIds], references: [id])
+}
+
+model Message {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  content        String?
+  mediaUrl       String?
+  type           MessageType @default(TEXT)
+  createdAt      DateTime    @default(now())
+
+  sender         User   @relation("MessageSender", fields: [senderId], references: [id])
+  senderId       String @db.ObjectId
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  conversationId String       @db.ObjectId
+
+  reactions      Reaction[] @relation("MessageReactions")
+  isSavedBy      String[] @db.ObjectId
+}
+
+model Reaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  emoji     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation("UserReactions", fields: [userId], references: [id])
+  userId    String   @db.ObjectId
+
+  message   Message  @relation("MessageReactions", fields: [messageId], references: [id])
+  messageId String   @db.ObjectId
+
+  @@unique([userId, messageId])
+}
+
+model Notification {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  type        String   
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("NotificationSender", fields: [senderId], references: [id])
+  senderId    String   @db.ObjectId
+
+  receiver    User     @relation("NotificationReceiver", fields: [receiverId], references: [id])
+  receiverId  String   @db.ObjectId
+}
+
+model Report {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  reason      String      
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  reporterId  String   @db.ObjectId
+
+  reportedUser   User?   @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reportedUserId String? @db.ObjectId
+
+  reportedSnap   Snap?   @relation(fields: [reportedSnapId], references: [id])
+  reportedSnapId String? @db.ObjectId
+
+  reportedStory  Story?  @relation(fields: [reportedStoryId], references: [id])
+  reportedStoryId String? @db.ObjectId
+}
+
+// --- ENUMS ---
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum SnapStatus {
+  SENT
+  DELIVERED
+  OPENED
+  REPLAYED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+enum StoryPrivacy {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+</file>
+
+<file path="public/test-client.html">
+<!doctype html>
+<html>
+<head>
+    <title>Snapchat Clone - Full Reactions</title>
+    <style>
+        body { font-family: sans-serif; background: #FFFC00; margin: 20px; }
+        .chat-box { background: white; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        #messages { height: 400px; border: 1px solid #eee; overflow-y: auto; margin-bottom: 10px; padding: 10px; display: flex; flex-direction: column; background: #fafafa; border-radius: 10px; }
+        
+        /* Message Styling */
+        .msg { padding: 10px; margin: 10px 5px; border-radius: 12px; max-width: 70%; word-wrap: break-word; position: relative; cursor: pointer; user-select: none; transition: transform 0.1s; }
+        .msg:active { transform: scale(0.95); }
+        .me { background: #0084ff; color: white; align-self: flex-end; }
+        .other { background: #e5e5ea; align-self: flex-start; }
+        
+        .msg * { pointer-events: none; }
+
+        /* Reaction Badge with Pop Animation */
+        .reaction-badge {
+            position: absolute;
+            bottom: -15px;
+            right: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 16px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 10;
+            animation: pop 0.2s ease-out;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.5); }
+            100% { transform: scale(1); }
+        }
+        
+        input { width: 100%; padding: 10px; margin-bottom: 8px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; margin-bottom: 5px; }
+        .btn-group { background: #222; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div id="notification-layer" style="position:fixed; top:0; left:0; width:100%; z-index:9999999; pointer-events:none;"></div>
+
+    <div class="chat-box">
+        <h3 style="text-align: center;">👻 Snapchat Mode</h3>
+        <input id="userId" placeholder="MERA NAAM (e.g., ravin)">
+        <input id="receiverId" placeholder="RECEIVER KA NAAM (Personal)">
+        <input id="convId" placeholder="ROOM/GROUP ID (e.g., 123)">
+        <button id="connectBtn" onclick="connectSocket()">CONNECT NOW</button>
+        
+        <div id="messages"></div>
+        
+        <input id="msgInput" placeholder="Type message...">
+        <div style="display:flex; gap: 5px;">
+            <button onclick="sendMessage()" style="background: #0084ff;">SEND PERSONAL</button>
+            <button onclick="sendGroupMessage()" class="btn-group">SEND GROUP</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+    <script>
+        let socket;
+        const msgDiv = document.getElementById('messages');
+        let activeReactions = {}; // State tracking for toggle
+
+        function connectSocket() {
+            const userId = document.getElementById('userId').value.trim();
+            const convId = document.getElementById('convId').value.trim();
+
+            if (!userId || !convId) return alert("Bhai, Naam aur Room ID bharo!");
+
+            if (socket) socket.disconnect();
+            socket = io("http://localhost:5000");
+
+            socket.on('connect', () => {
+                socket.emit('setup', userId);
+                socket.emit('join_chat', convId); 
+                document.getElementById('connectBtn').innerText = "Connected ✅";
+                document.getElementById('connectBtn').style.background = "green";
+            });
+
+            socket.on('message_received', (data) => {
+                const myId = document.getElementById('userId').value.trim();
+                const type = data.senderId === myId ? 'me' : 'other';
+                showMsg(data.senderId, data.content, type, data.messageId);
+            });
+
+            socket.on('group_message_received', (data) => {
+                showMsg(data.senderName, data.content, 'other', data.messageId);
+            });
+
+            // ⚡ Real-time Reaction Listener (Sabke liye chalega)
+            socket.on('reaction_updated', (data) => {
+                console.log("Reaction update from socket:", data);
+                const isRemoved = data.actionType === "REMOVED";
+                updateReactionUI(data.messageId, data.emoji, isRemoved);
+                activeReactions[data.messageId] = isRemoved ? null : data.emoji;
+            });
+
+            socket.on('notification_received', (data) => {
+                showSnapAlert(data.title, data.message);
+            });
+        }
+
+        // --- ⚡ Updated Reaction Handler (With Toggle & Socket) ---
+        async function handleReaction(messageId, emoji) {
+            const userId = document.getElementById('userId').value.trim();
+            const roomId = document.getElementById('convId').value.trim();
+
+            // Toggle Logic: Check if already reacted
+            let isRemoved = activeReactions[messageId] === emoji;
+            const actionType = isRemoved ? "REMOVED" : "ADDED";
+
+            // 1. Local UI Update (Fast Feel)
+            updateReactionUI(messageId, emoji, isRemoved);
+            activeReactions[messageId] = isRemoved ? null : emoji;
+
+            // 2. Broadcast to Others via Socket
+            if (socket) {
+                socket.emit('send_reaction', { messageId, emoji, userId, roomId, actionType });
+            }
+
+            // 3. Backend DB Update
+            try {
+                const response = await fetch('http://localhost:5000/api/v1/reactions/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messageId, emoji, userId, roomId })
+                });
+
+                if (!response.ok) throw new Error("Backend not found");
+            } catch (err) {
+                console.warn("DB not updated, but socket worked!");
+            }
+        }
+
+        function updateReactionUI(messageId, emoji, isRemoved) {
+            const badge = document.getElementById(`react-${messageId}`);
+            if (badge) {
+                badge.innerText = isRemoved ? "" : emoji;
+                badge.style.display = isRemoved ? "none" : "block";
+            }
+        }
+
+        function sendMessage() {
+            const content = document.getElementById('msgInput').value;
+            const userId = document.getElementById('userId').value.trim();
+            const receiverId = document.getElementById('receiverId').value.trim();
+            const convId = document.getElementById('convId').value.trim();
+            const msgId = "msg-" + Date.now();
+
+            if (!content || !socket || !receiverId) return alert("Receiver Name bharo!");
+
+            socket.emit('new_message', { 
+                conversationId: convId, senderId: userId, content: content, receiverId: receiverId, messageId: msgId
+            });
+
+            showMsg('Me', content, 'me', msgId);
+            document.getElementById('msgInput').value = '';
+        }
+
+        function sendGroupMessage() {
+            const content = document.getElementById('msgInput').value;
+            const groupId = document.getElementById('convId').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            const msgId = "msg-" + Date.now();
+
+            if (!content || !socket || !groupId) return alert("Room ID bharo!");
+
+            socket.emit('new_group_message', {
+                groupId: groupId, senderId: userId, senderName: userId, content: content, messageId: msgId
+            });
+
+            showMsg('Me', content, 'me', msgId);
+            document.getElementById('msgInput').value = '';
+        }
+
+        function showMsg(sender, text, type, msgId) {
+            const div = document.createElement('div');
+            const idToUse = msgId || "msg-" + Date.now();
+            div.className = `msg ${type}`;
+            div.id = idToUse;
+            
+            div.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                handleReaction(idToUse, '❤️');
+            });
+
+            div.innerHTML = `
+                <small style="display:block; font-size:10px; margin-bottom:3px; opacity:0.8;">${sender}</small>
+                ${text}
+                <div class="reaction-badge" id="react-${idToUse}"></div>
+            `;
+            
+            msgDiv.appendChild(div);
+            msgDiv.scrollTop = msgDiv.scrollHeight;
+        }
+
+        function showSnapAlert(title, message) {
+            const layer = document.getElementById('notification-layer');
+            const notifyDiv = document.createElement('div');
+            Object.assign(notifyDiv.style, {
+                margin: "20px auto", width: "fit-content", backgroundColor: "#FFFC00",
+                padding: "10px 25px", borderRadius: "50px", border: "3px solid black",
+                fontWeight: "bold", textAlign: "center", boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
+                pointerEvents: "auto"
+            });
+            notifyDiv.innerHTML = `👻 ${title}: ${message}`;
+            layer.appendChild(notifyDiv);
+            setTimeout(() => notifyDiv.remove(), 4000);
+        }
+    </script>
+</body>
+</html>
+</file>
+
+<file path="src/config/ai.ts">
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+// Gemini AI Setup (Snapchat ke 'My AI' jaisa feature banane ke liye)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+export const aiModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+export const getAIResponse = async (prompt: string) => {
+  try {
+    const result = await aiModel.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
+  } catch (error) {
+    console.error("AI Generation Error:", error);
+    return "Bhai, AI thoda thak gaya hai. Baad mein try karo!";
+  }
+};
+</file>
+
+<file path="src/config/aws.ts">
+import { S3Client } from "@aws-sdk/client-s3";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+export const s3Client = new S3Client({
+  region: process.env.AWS_REGION!,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
+</file>
+
+<file path="src/config/gcs.ts">
+import { Storage } from "@google-cloud/storage";
+import path from "path";
+
+// Service account key file ka path .env se aayega
+const storage = new Storage({
+  keyFilename: path.join(__dirname, "../../", process.env.GCS_KEY_FILE!),
+  projectId: process.env.GCS_PROJECT_ID,
+});
+
+export const bucket = storage.bucket(process.env.GCS_BUCKET_NAME!);
+</file>
+
+<file path="src/config/prisma.ts">
+import { PrismaClient } from '@prisma/client';
+
+const globalForPrisma = global as unknown as { prisma: PrismaClient };
+
+// Prisma 5 Singleton Pattern
+export const prisma =
+  globalForPrisma.prisma ||
+  new PrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+export default prisma;
+</file>
+
+<file path="src/config/socket.ts">
+import { Server } from "socket.io";
+import http from "http";
+
+export const initSocket = (server: http.Server) => {
+  const io = new Server(server, {
+    cors: {
+      origin: "*", // Production mein isko specific domain par set karna
+      methods: ["GET", "POST"],
+    },
+  });
+
+  io.on("connection", (socket) => {
+    console.log(`⚡ User Connected: ${socket.id}`);
+
+    // Join personal room for private snaps/messages
+    socket.on("join_room", (userId: string) => {
+      socket.join(userId);
+      console.log(`👤 User with ID: ${userId} joined their room`);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("❌ User Disconnected", socket.id);
+    });
+  });
+
+  return io;
+};
+</file>
+
+<file path="src/index.ts">
+import { storyCleanupJob } from "./jobs/storyCleanup";
+import { snapCleanupJob } from "./jobs/snapCleanup";
+
+// Server start ke logic ke sath:
+storyCleanupJob();
+snapCleanupJob();
+</file>
+
+<file path="src/jobs/snapCleanup.ts">
+import cron from "node-cron";
+import prisma from "../config/prisma";
+
+export const snapCleanupJob = () => {
+  cron.schedule("*/30 * * * *", async () => { // Har 30 min mein chalega
+    console.log("📸 Cleaning up opened snaps...");
+    try {
+      const now = new Date();
+      
+      const result = await prisma.snap.deleteMany({
+        where: {
+          status: "OPENED",
+          expiresAt: { lt: now }
+        }
+      });
+      
+      console.log(`✅ Deleted ${result.count} viewed snaps.`);
+    } catch (error) {
+      console.error("❌ Snap Cleanup Error:", error);
+    }
+  });
+};
+</file>
+
+<file path="src/jobs/storyCleanup.ts">
+import cron from "node-cron";
+import prisma from "../config/prisma";
+
+// Har ghante chalega ye job
+export const storyCleanupJob = () => {
+  cron.schedule("0 * * * *", async () => {
+    console.log("🧹 Running Story Cleanup Job...");
+    try {
+      const now = new Date();
+      
+      const deleted = await prisma.story.deleteMany({
+        where: {
+          expiresAt: { lt: now } // Jo expire ho chuki hain
+        }
+      });
+
+      console.log(`✅ Deleted ${deleted.count} expired stories.`);
+    } catch (error) {
+      console.error("❌ Story Cleanup Error:", error);
+    }
+  });
+};
+</file>
+
+<file path="src/middlewares/auth.middleware.ts">
+// src/middlewares/auth.middleware.ts
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+
+export interface AuthRequest extends Request {
+    user?: { id: string; role: string };
+}
+
+export const protect = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretkey') as any;
+            
+            // Yahan ensure kar rahe hain ki 'id' hi jaye
+            req.user = { id: decoded.id, role: decoded.role };
+            return next();
+        } catch (error) {
+            return res.status(401).json({ success: false, message: "Token invalid" });
+        }
+    }
+    if (!token) return res.status(401).json({ success: false, message: "No token found" });
+};
+</file>
+
+<file path="src/middlewares/error.middleware.ts">
+import { Request, Response, NextFunction } from "express";
+
+export const globalErrorHandler = (
+  err: any,
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  console.error("ERROR 💥:", err);
+
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
+};
+</file>
+
+<file path="src/middlewares/rateLimit.middleware.ts">
+import rateLimit from "express-rate-limit";
+
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 attempts (Signup/Login ke liye)
+  message: {
+    success: false,
+    message: "Too many attempts, please try again after 15 minutes",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // General APIs ke liye limit
+  message: { message: "Slow down! You are making too many requests." }
+});
+</file>
+
+<file path="src/middlewares/role.middleware.ts">
+import { Request, Response, NextFunction } from "express";
+
+/**
+ * Ye middleware check karega ki logged-in user ke paas 
+ * required role hai ya nahi.
+ * Example use: authorizeRoles("ADMIN", "MODERATOR")
+ */
+
+export const authorizeRoles = (...allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    
+    // 1. Check karo ki user auth middleware se pass hoke aaya hai ya nahi
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: User information not found",
+      });
+    }
+
+    // 2. Check karo ki user ka role allowed list mein hai
+    // Note: req.user.role humne Auth middleware mein JWT se extract kiya tha
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden: Role '${req.user.role}' is not allowed to access this resource`,
+      });
+    }
+
+    // 3. Sab sahi hai toh aage badho
+    next();
+  };
+};
+</file>
+
+<file path="src/middlewares/upload.middleware.ts">
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary";
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    // File extension check karne ke liye logic
+    const isVideo = file.mimetype.startsWith("video");
+    return {
+      folder: "snapify_uploads",
+      resource_type: isVideo ? "video" : "image", 
+      allowed_formats: ["jpg", "jpeg", "png", "mp4", "mov"],
+    };
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit (videos ke liye zaroori hai)
+});
+
+export default upload;
+</file>
+
+<file path="src/middlewares/validate.middleware.ts">
+import { Request, Response, NextFunction } from "express";
+import { z, ZodError } from "zod";
+
+// Error 1 Fix: 'z.AnyZodObject' ki jagah 'z.ZodSchema' ya direct object type use karna
+export const validate = (schema: z.ZodSchema) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await schema.parseAsync({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
+      
+      return next(); 
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation Error",
+          // Error 2 & 3 Fix: 'issues' use karna aur proper mapping
+          errors: error.issues.map((err) => ({
+            field: err.path.join("."), 
+            message: err.message,
+          })),
+        });
+      }
+      
+      return res.status(500).json({
+        success: false,
+        message: "Internal Server Error during validation",
+      });
+    }
+  };
+};
+</file>
+
+<file path="src/modules/admin/admin.controller.ts">
+import { Request, Response } from "express";
+import prisma from "../../config/prisma";
+
+export class AdminController {
+  async getAllUsers(req: Request, res: Response) {
+    try {
+      const users = await prisma.user.findMany({
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          // Agar 'prisma generate' ke baad bhi yahan error aaye, 
+          // toh samjho schema mein spelling mistake hai
+          role: true, 
+          createdAt: true,
+        },
+      });
+      res.status(200).json({ success: true, data: users });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async deleteUser(req: Request, res: Response) {
+    try {
+      // Fix: userId ko string confirm karne ke liye casting (as string)
+      const userId = req.params.userId as string;
+
+      if (!userId) {
+        return res.status(400).json({ success: false, message: "User ID is required" });
+      }
+
+      await prisma.user.delete({ 
+        where: { id: userId } 
+      });
+
+      res.status(200).json({ success: true, message: "User deleted by Admin" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/admin/admin.routes.ts">
+import { Router } from "express";
+import { AdminController } from "./admin.controller";
+import { protect } from "../../middlewares/auth.middleware";
+import { authorizeRoles } from "../../middlewares/role.middleware";
+
+const router = Router();
+const adminController = new AdminController();
+
+// Sirf ADMIN hi in routes ko touch kar sakta hai
+router.use(protect, authorizeRoles("ADMIN"));
+
+router.get("/users", adminController.getAllUsers);
+router.delete("/user/:userId", adminController.deleteUser);
+
+export default router;
+</file>
+
+<file path="src/modules/ai/ai.controller.ts">
+import { Request, Response } from "express";
+import { AIService } from "./ai.service";
+
+const aiService = new AIService();
+
+export class AIController {
+  async chatWithAI(req: Request, res: Response) {
+    try {
+      const { prompt } = req.body;
+
+      if (!prompt) {
+        return res.status(400).json({ success: false, message: "Kuch toh pucho bhai!" });
+      }
+
+      const aiResponse = await aiService.getAIResponse(prompt);
+
+      res.status(200).json({
+        success: true,
+        reply: aiResponse
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/ai/ai.routes.ts">
+import { Router } from "express";
+import { AIController } from "./ai.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const aiController = new AIController();
+
+// Route: POST /api/ai/chat
+router.post("/chat", protect, aiController.chatWithAI);
+
+export default router;
+</file>
+
+<file path="src/modules/ai/ai.service.ts">
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// .env mein GEMINI_API_KEY hona chahiye
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+
+export class AIService {
+  async getAIResponse(prompt: string) {
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      
+      // Snapchat AI ki tarah thoda friendly context dete hain
+      const fullPrompt = `You are "My AI" on Snapify, a friendly and helpful AI assistant. 
+      Keep your responses concise and fun, just like Snapchat. 
+      User says: ${prompt}`;
+
+      const result = await model.generateContent(fullPrompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error) {
+      console.error("AI Service Error:", error);
+      throw new Error("AI response generate nahi ho paya.");
+    }
+  }
+}
+</file>
+
+<file path="src/modules/ai/ai.ts">
+import { Request, Response } from "express";
+import { getAIResponse } from "../../config/ai";
+
+export const chatWithAI = async (req: Request, res: Response) => {
+  try {
+    const { prompt } = req.body;
+    const aiText = await getAIResponse(prompt);
+    res.status(200).json({ success: true, response: aiText });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "AI Offline" });
+  }
+};
+</file>
+
+<file path="src/modules/auth/auth.controller.ts">
+import { Request, Response } from 'express';
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const prisma = new PrismaClient();
+
+// --- REGISTER ---
+export const register = async (req: Request, res: Response) => {
+    try {
+        const { username, email, password, displayName } = req.body;
+
+        // 1. Check if user already exists
+        const existingUser = await prisma.user.findFirst({
+            where: { OR: [{ email }, { username }] }
+        });
+
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: "User already exists" });
+        }
+
+        // 2. Hash Password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // 3. Create User
+        const user = await prisma.user.create({
+            data: {
+                username,
+                email,
+                password: hashedPassword,
+                displayName: displayName || username
+            }
+        });
+
+        res.status(201).json({ success: true, message: "User registered successfully" });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// --- LOGIN ---
+export const login = async (req: Request, res: Response) => {
+    try {
+        const { identifier, password } = req.body; // identifier = email or username
+
+        // 1. Find user by email OR username
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: identifier },
+                    { username: identifier }
+                ]
+            }
+        });
+
+        if (!user) {
+            return res.status(401).json({ success: false, message: "Invalid credentials (User not found)" });
+        }
+
+        // 2. Check Password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Invalid credentials (Password mismatch)" });
+        }
+
+        // 3. Generate Token
+        const token = jwt.sign(
+            { id: user.id },
+            process.env.JWT_SECRET || 'supersecretkey',
+            { expiresIn: '7d' }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: `Welcome back, ${user.username}!`,
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email
+            }
+        });
+    } catch (error: any) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+</file>
+
+<file path="src/modules/auth/auth.routes.ts">
+import { Router } from 'express';
+// Functions ko brackets {} mein import karo
+import { register, login } from './auth.controller'; 
+
+const router = Router();
+
+// Yahan seedha functions pass karo, 'new AuthController()' ki zaroorat nahi hai
+router.post('/register', register);
+router.post('/login', login);
+
+export default router;
+</file>
+
+<file path="src/modules/auth/auth.schema.ts">
+import { z } from 'zod';
+
+export const registerSchema = z.object({
+  body: z.object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    username: z.string().min(3, 'Username must be at least 3 characters'),
+    displayName: z.string().optional(),
+  })
+});
+
+export const loginSchema = z.object({
+  body: z.object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(1, 'Password is required'),
+  })
+});
+</file>
+
+<file path="src/modules/auth/auth.service.ts">
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import prisma from "../../config/prisma";
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+
+export class AuthService {
+  async register(data: any) {
+    const { email, username, password, displayName } = data;
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { username }]
+      }
+    });
+
+    if (existingUser) {
+      throw new Error('User with this email or username already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        username,
+        password: hashedPassword,
+        displayName: displayName || username,
+      }
+    });
+
+    const token = this.generateToken(user.id, (user as any).role);
+
+    const { password: _, ...userWithoutPassword } = user;
+    return { user: userWithoutPassword, token };
+  }
+
+  async login(data: { identifier: string; password: any }) {
+    const { identifier, password } = data;
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { username: identifier }
+        ]
+      }
+    });
+
+    if (!user) throw new Error('Invalid credentials');
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) throw new Error('password is incorrect');
+
+    const token = this.generateToken(user.id, (user as any).role);
+
+    const { password: _, ...userWithoutPassword } = user;
+    return { user: userWithoutPassword, token };
+  }
+
+  private generateToken(userId: string, role: string = 'USER'): string {
+    return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '7d' });
+  }
+}
+</file>
+
+<file path="src/modules/block/block.controller.ts">
+import { Request, Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class BlockController {
+  // 1. User ko Block karna
+  async blockUser(req: AuthRequest, res: Response) {
+    try {
+      const { blockUserId } = req.body; // Jise block karna hai
+      const myId = req.user?.id;       // Jo block kar raha hai
+
+      if (myId === blockUserId) {
+        return res.status(400).json({ success: false, message: "Apne aap ko block mat karo bhai!" });
+      }
+
+      // Check karo kya pehle se friendship exist karti hai?
+      // FriendshipStatus ko update karke BLOCKED karenge
+      await prisma.friendship.upsert({
+        where: {
+          requesterId_addresseeId: {
+            requesterId: myId!,
+            addresseeId: blockUserId,
+          },
+        },
+        update: { status: "BLOCKED" },
+        create: {
+          requesterId: myId!,
+          addresseeId: blockUserId,
+          status: "BLOCKED",
+        },
+      });
+
+      res.status(200).json({ success: true, message: "User blocked successfully" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Blocked Users ki list dekhna
+  async getBlockedUsers(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      const blockedList = await prisma.friendship.findMany({
+        where: {
+          requesterId: myId,
+          status: "BLOCKED",
+        },
+        include: {
+          addressee: {
+            select: { id: true, username: true, displayName: true, avatarUrl: true }
+          }
+        }
+      });
+
+      res.status(200).json({ success: true, data: blockedList });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+ // 3. Unblock karna
+  async unblockUser(req: AuthRequest, res: Response) {
+    try {
+      // Fix: 'as string' use karke TS ko batao ki ye array nahi hai
+      const unblockUserId = req.params.unblockUserId as string;
+      const myId = req.user?.id;
+
+      if (!unblockUserId || !myId) {
+        return res.status(400).json({ success: false, message: "IDs missing hain" });
+      }
+
+      const result = await prisma.friendship.deleteMany({
+        where: {
+          requesterId: myId,
+          addresseeId: unblockUserId,
+          status: "BLOCKED"
+        }
+      });
+
+      if (result.count === 0) {
+        return res.status(404).json({ success: false, message: "Block record nahi mila" });
+      }
+
+      res.status(200).json({ success: true, message: "User unblocked successfully" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/block/block.routes.ts">
+import { Router } from "express";
+import { BlockController } from "./block.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const blockController = new BlockController();
+
+router.use(protect); // Sabhi routes ke liye login zaroori hai
+
+router.post("/", blockController.blockUser);
+router.get("/list", blockController.getBlockedUsers);
+router.delete("/:unblockUserId", blockController.unblockUser);
+
+export default router;
+</file>
+
+<file path="src/modules/chat/chat.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class ChatController {
+  // 1. Nayi Conversation shuru karna ya existing dhoondna
+ async accessConversation(req: AuthRequest, res: Response) {
+    try {
+      const { receiverId } = req.body;
+      const myId = req.user?.id;
+
+      if (!receiverId) return res.status(400).json({ message: "Receiver ID zaroori hai" });
+
+      // Step 1: Existing conversation dhoondo
+      let conversation = await prisma.conversation.findFirst({
+        where: {
+          isGroup: false,
+          participantIds: {
+            hasEvery: [myId!, receiverId]
+          }
+        },
+        include: {
+          messages: { take: 1, orderBy: { createdAt: 'desc' } }, 
+          participants: { select: { id: true, username: true, avatarUrl: true } }
+        }
+      });
+
+      // Step 2: Agar nahi milti toh nayi banao
+      if (!conversation) {
+        conversation = await prisma.conversation.create({
+          data: {
+            participantIds: [myId!, receiverId],
+            isGroup: false,
+          },
+          // FIX: Yahan bhi 'messages' include karna hoga taaki Type mismatch na ho
+          include: {
+            messages: { take: 1, orderBy: { createdAt: 'desc' } }, 
+            participants: { select: { id: true, username: true, avatarUrl: true } }
+          }
+        });
+      }
+
+      res.status(200).json({ success: true, data: conversation });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Apni saari Chats (Conversations) ki list dekhna
+  async getMyChats(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      const chats = await prisma.conversation.findMany({
+        where: {
+          participantIds: { has: myId }
+        },
+        include: {
+          participants: { select: { id: true, username: true, avatarUrl: true } },
+          messages: { take: 1, orderBy: { createdAt: 'desc' } }
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      res.status(200).json({ success: true, data: chats });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/chat/chat.routes.ts">
+import { Router } from "express";
+import { ChatController } from "./chat.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const chatController = new ChatController();
+
+router.use(protect);
+
+router.post("/", chatController.accessConversation); // Chat shuru karne ke liye
+router.get("/", chatController.getMyChats);           // Saari chats dekhne ke liye
+
+export default router;
+</file>
+
+<file path="src/modules/friend/friend.routes.ts">
+import { Router } from "express";
+import { FriendController } from "./friend.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const friendController = new FriendController();
+
+router.use(protect);
+
+// Purane names: sendFriendRequest -> Naya: sendRequest
+router.post("/send", friendController.sendRequest); 
+
+// Purane names: acceptFriendRequest -> Naya: acceptRequest
+router.patch("/accept/:requestId", friendController.acceptRequest); 
+
+// Dost dekhne ke liye list route
+router.get("/list", friendController.getFriendsList);
+
+export default router;
+</file>
+
+<file path="src/modules/group/group.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class GroupController {
+  // 1. Naya Group banana
+  async createGroup(req: AuthRequest, res: Response) {
+    try {
+      const { name, participantIds } = req.body; // participantIds: string[] (Friends ki IDs)
+      const myId = req.user?.id;
+
+      if (!name || !participantIds || participantIds.length < 2) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Group ke liye naam aur kam se kam 2 aur log chahiye!" 
+        });
+      }
+
+      // Khud ki ID ko participants list mein add karna mat bhoolna
+      const uniqueParticipants = Array.from(new Set([...participantIds, myId!]));
+
+      const group = await prisma.conversation.create({
+        data: {
+          name,
+          isGroup: true,
+          participantIds: uniqueParticipants,
+        },
+        include: {
+          participants: {
+            select: { id: true, username: true, avatarUrl: true }
+          }
+        }
+      });
+
+      res.status(201).json({ success: true, data: group });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Mere saare Groups ki list
+  async getMyGroups(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      const groups = await prisma.conversation.findMany({
+        where: {
+          isGroup: true,
+          participantIds: { has: myId }
+        },
+        include: {
+          participants: { select: { id: true, username: true } },
+          _count: { select: { messages: true } } // Kitne messages hain group mein
+        },
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      res.status(200).json({ success: true, data: groups });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 3. Group mein naya member add karna
+  async addMember(req: AuthRequest, res: Response) {
+    try {
+      const { groupId, newUserId } = req.body;
+
+      await prisma.conversation.update({
+        where: { id: groupId },
+        data: {
+          participantIds: { push: newUserId }
+        }
+      });
+
+      res.status(200).json({ success: true, message: "Member add ho gaya!" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/group/group.routes.ts">
+import { Router } from "express";
+import { GroupController } from "./group.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const groupController = new GroupController();
+
+router.use(protect); // Bina login ke group ka access nahi
+
+router.post("/create", groupController.createGroup);
+router.get("/my-groups", groupController.getMyGroups);
+router.patch("/add-member", groupController.addMember);
+
+export default router;
+</file>
+
+<file path="src/modules/message/message.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class MessageController {
+  // 1. Message Bhejna (Text ya Media)
+  async sendMessage(req: AuthRequest, res: Response) {
+    try {
+      const { content, conversationId, type, mediaUrl } = req.body;
+      const senderId = req.user?.id;
+
+      // Basic Validation
+      if (!conversationId) {
+        return res.status(400).json({ success: false, message: "Conversation ID zaroori hai" });
+      }
+
+      if (!content && !mediaUrl) {
+        return res.status(400).json({ success: false, message: "Kuch toh likho ya media bhejo!" });
+      }
+
+      // 1. Check karo ki kya conversation exist karti hai
+      const conversation = await prisma.conversation.findUnique({
+        where: { id: conversationId as string }
+      });
+
+      if (!conversation) {
+        return res.status(404).json({ success: false, message: "Conversation nahi mili" });
+      }
+
+      // 2. Naya message banao
+      const newMessage = await prisma.message.create({
+        data: {
+          content,
+          mediaUrl,
+          type: type || "TEXT",
+          senderId: senderId!,
+          conversationId: conversationId as string,
+        },
+        include: {
+          sender: { 
+            select: { 
+              id: true, 
+              username: true, 
+              avatarUrl: true 
+            } 
+          }
+        }
+      });
+
+      // 3. Conversation ki 'updatedAt' field update karo (taaki chat list mein ye top par aaye)
+      await prisma.conversation.update({
+        where: { id: conversationId as string },
+        data: { updatedAt: new Date() }
+      });
+
+      res.status(201).json({ 
+        success: true, 
+        message: "Message bhej diya gaya", 
+        data: newMessage 
+      });
+
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Chat ki saari Messages fetch karna (History)
+  async getChatMessages(req: AuthRequest, res: Response) {
+    try {
+      // FIX: 'as string' casting taaki TS error na de
+      const conversationId = req.params.conversationId as string;
+      const myId = req.user?.id;
+
+      if (!conversationId) {
+        return res.status(400).json({ success: false, message: "Conversation ID missing hai" });
+      }
+
+      // 1. Messages fetch karo
+      const messages = await prisma.message.findMany({
+        where: { 
+          conversationId: conversationId 
+        },
+        include: {
+          sender: { 
+            select: { 
+              id: true, 
+              username: true, 
+              avatarUrl: true 
+            } 
+          }
+        },
+        orderBy: { 
+          createdAt: 'asc' // Purani pehle, nayi baad mein
+        }
+      });
+
+      res.status(200).json({ 
+        success: true, 
+        count: messages.length, 
+        data: messages 
+      });
+
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/message/message.routes.ts">
+import { Router } from "express";
+import { MessageController } from "./message.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const messageController = new MessageController();
+
+router.use(protect); // Bina login ke message nahi bhej sakte
+
+router.post("/send", messageController.sendMessage);
+router.get("/:conversationId", messageController.getChatMessages);
+
+export default router;
+</file>
+
+<file path="src/modules/notification/notification.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class NotificationController {
+  // 1. User ki saari notifications get karna
+  async getMyNotifications(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      const notifications = await prisma.notification.findMany({
+        where: { receiverId: myId },
+        include: {
+          sender: { 
+            select: { id: true, username: true, avatarUrl: true } 
+          }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      res.status(200).json({ success: true, data: notifications });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Kisi specific notification ko 'Read' mark karna
+  async markAsRead(req: AuthRequest, res: Response) {
+    try {
+      const { notificationId } = req.params;
+
+      if (!notificationId) {
+        return res.status(400).json({ success: false, message: "ID missing hai" });
+      }
+
+      await prisma.notification.update({
+        where: { id: notificationId as string },
+        data: { isRead: true }
+      });
+
+      res.status(200).json({ success: true, message: "Notification read!" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 3. Saari notifications ko ek sath read mark karna (Clear all types)
+  async markAllAsRead(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      await prisma.notification.updateMany({
+        where: { receiverId: myId, isRead: false },
+        data: { isRead: true }
+      });
+
+      res.status(200).json({ success: true, message: "Sab read ho gaya!" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/notification/notification.route.ts">
+import { Router } from "express";
+import { NotificationController } from "./notification.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const notificationController = new NotificationController();
+
+router.use(protect);
+
+router.get("/", notificationController.getMyNotifications);
+router.patch("/read/:notificationId", notificationController.markAsRead);
+router.patch("/read-all", notificationController.markAllAsRead);
+
+export default router;
+</file>
+
+<file path="src/modules/report/report.routes.ts">
+import { Router } from "express";
+import { ReportController } from "./report.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const reportController = new ReportController();
+
+router.use(protect);
+
+// User report submit karne ke liye
+router.post("/submit", reportController.submitReport);
+
+// Admin ke liye routes
+router.get("/all", reportController.getReports);
+router.patch("/status/:reportId", reportController.updateReportStatus);
+
+export default router;
+</file>
+
+<file path="src/modules/score/score.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class ScoreController {
+  // 1. Apna current score aur streak dekhna
+  async getMyStats(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          score: true,
+          streak: true,
+          username: true,
+          displayName: true
+        }
+      });
+
+      if (!user) {
+        return res.status(404).json({ success: false, message: "User nahi mila" });
+      }
+
+      res.status(200).json({ success: true, data: user });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Score badhane ka logic (Ye internally call hoga jab snap bhejenge)
+  // Par abhi testing ke liye hum ise ek route de dete hain
+  async incrementScore(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { points } = req.body; // points: kitne se score badhana hai
+
+      const updatedUser = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          score: {
+            increment: points || 1
+          }
+        }
+      });
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Score updated!", 
+        newScore: updatedUser.score 
+      });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/score/score.routes.ts">
+import { Router } from "express";
+import { ScoreController } from "./score.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const scoreController = new ScoreController();
+
+router.use(protect);
+
+router.get("/me", scoreController.getMyStats);
+router.post("/update", scoreController.incrementScore);
+
+export default router;
+</file>
+
+<file path="src/modules/story/story.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class StoryController {
+  // 1. Nayi Story post karna
+  async postStory(req: AuthRequest, res: Response) {
+    try {
+      const { url, mediaType, privacy } = req.body;
+      const authorId = req.user?.id;
+
+      if (!url || !mediaType) {
+        return res.status(400).json({ success: false, message: "URL aur MediaType zaroori hain!" });
+      }
+
+      // 24 hours expiry logic
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+
+      const story = await prisma.story.create({
+        data: {
+          url,
+          mediaType,
+          privacy: privacy || "FRIENDS",
+          expiresAt,
+          authorId: authorId!,
+        },
+      });
+
+      res.status(201).json({ success: true, data: story });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Apne Friends ki active stories dekhna
+  async getFeed(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      // Pehle apne friends ki IDs nikalon
+      const myFriends = await prisma.friendship.findMany({
+        where: {
+          OR: [{ requesterId: myId }, { addresseeId: myId }],
+          status: "ACCEPTED",
+        },
+      });
+
+      const friendIds = myFriends.map((f) => 
+        f.requesterId === myId ? f.addresseeId : f.requesterId
+      );
+
+      // Sirf wo stories jo abhi tak expire nahi hui hain
+      const stories = await prisma.story.findMany({
+        where: {
+          authorId: { in: friendIds },
+          expiresAt: { gt: new Date() }, // expiry date abhi ke time se badi honi chahiye
+        },
+        include: {
+          author: { select: { username: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      res.status(200).json({ success: true, data: stories });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 3. Story par View count badhana
+  async viewStory(req: AuthRequest, res: Response) {
+    try {
+      const { storyId } = req.params;
+      const viewerId = req.user?.id;
+
+      await prisma.storyView.upsert({
+        where: {
+          storyId_viewerId: {
+            storyId: storyId as string,
+            viewerId: viewerId!,
+          },
+        },
+        update: {}, // Agar pehle dekh chuka hai toh kuch mat karo
+        create: {
+          storyId: storyId as string,
+          viewerId: viewerId!,
+        },
+      });
+
+      res.status(200).json({ success: true, message: "Story viewed" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/story/story.routes.ts">
+import { Router } from "express";
+import { StoryController } from "./story.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const storyController = new StoryController();
+
+router.use(protect);
+
+router.post("/post", storyController.postStory); // Story dalne ke liye
+router.get("/feed", storyController.getFeed);    // Sabki stories dekhne ke liye
+router.post("/view/:storyId", storyController.viewStory); // View register karne ke liye
+
+export default router;
+</file>
+
+<file path="src/modules/streak/streak.routes.ts">
+import { Router } from "express";
+import { StreakController } from "./streak.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const streakController = new StreakController();
+
+router.use(protect);
+
+router.get("/my-streaks", streakController.getMyStreaks);
+
+export default router;
+</file>
+
+<file path="src/modules/user/user.controller.ts">
+import { Request, Response } from "express";
+import prisma from "../../config/prisma";
+
+// 1. Apni profile details nikalna
+export const getMe = async (req: any, res: Response) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "User not authenticated" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        displayName: true,
+        avatarUrl: true,
+        score: true,
+        streak: true,
+        createdAt: true
+      }
+    });
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 2. Profile Update
+export const updateProfile = async (req: any, res: Response) => {
+  try {
+    const { displayName, avatarUrl, bitmojiData } = req.body;
+    const userId = req.user?.userId || req.user?.id;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { displayName, avatarUrl, bitmojiData },
+      select: { // <--- Ye add karo password chhupane ke liye
+    id: true,
+    username: true,
+    displayName: true,
+    avatarUrl: true,
+    score: true,
+    streak: true,
+    updatedAt: true
+      }
+    });
+
+    res.status(200).json({ success: true, message: "Profile update ho gayi!", data: updatedUser });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// 3. User Search
+export const searchUsers = async (req: any, res: Response) => {
+  try {
+    const { query } = req.query;
+    const userId = req.user?.userId || req.user?.id;
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { username: { contains: query as string, mode: 'insensitive' } },
+          { displayName: { contains: query as string, mode: 'insensitive' } }
+        ],
+        NOT: { id: userId }
+      },
+      select: {
+        id: true,
+        username: true,
+        displayName: true,
+        avatarUrl: true
+      },
+      take: 10
+    });
+
+    res.status(200).json({ success: true, data: users });
+  } catch (error: any) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+</file>
+
+<file path="src/modules/user/user.routes.ts">
+import { Router } from "express";
+import { getMe, updateProfile, searchUsers } from "./user.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+
+router.get("/me", protect, getMe);
+router.put("/update", protect, updateProfile);
+router.get("/search", protect, searchUsers);
+
+export default router;
+</file>
+
+<file path="src/routes/index.ts">
+import { Router } from "express";
+import authRoutes from "../modules/auth/auth.routes";
+import userRoutes from "../modules/user/user.routes";
+import friendRoutes from "../modules/friend/friend.routes";
+import storyRoutes from "../modules/story/story.routes";
+import reportRoutes from "../modules/report/report.routes";
+import scoreRoutes from "../modules/score/score.routes";
+import snapRoutes from "../modules/snap/snap.routes";
+// ... baaki imports
+const router = Router();
+
+router.use("/auth", authRoutes);
+router.use("/users", userRoutes);
+router.use("/friends", friendRoutes);
+router.use("/stories", storyRoutes);
+router.use("/reports", reportRoutes);
+router.use("/score", scoreRoutes);
+router.use("/snaps", snapRoutes); // Ab API banegi: /api/v1/snaps/send
+export default router;
+</file>
+
+<file path="src/types/index.d.ts">
+import { User } from "@prisma/client";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: { id: string; role: string };
+    }
+  }
+}
+import { Express } from "express-serve-static-core";
+
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        role: string;
+      };
+    }
+  }
+}
+</file>
+
+<file path="src/uploads/upload.middleware.ts">
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import cloudinary from "../config/cloudinary";
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (req, file) => {
+    // File extension check karne ke liye logic
+    const isVideo = file.mimetype.startsWith("video");
+    return {
+      folder: "snapify_uploads",
+      resource_type: isVideo ? "video" : "image", 
+      allowed_formats: ["jpg", "jpeg", "png", "mp4", "mov"],
+    };
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit (videos ke liye zaroori hai)
+});
+
+export default upload;
+</file>
+
+<file path="src/utils/ApiError.ts">
+class ApiError extends Error {
+    statusCode: number;
+    data: any;
+    success: boolean;
+    errors: any[];
+
+    constructor(
+        statusCode: number,
+        message = "Something went wrong",
+        errors = [],
+        stack = ""
+    ) {
+        super(message);
+        this.statusCode = statusCode;
+        this.data = null;
+        this.message = message;
+        this.success = false;
+        this.errors = errors;
+
+        if (stack) {
+            this.stack = stack;
+        } else {
+            Error.captureStackTrace(this, this.constructor);
+        }
+    }
+}
+
+export { ApiError };
+</file>
+
+<file path="src/utils/ApiResponse.ts">
+class ApiResponse {
+    statusCode: number;
+    data: any;
+    message: string;
+    success: boolean;
+
+    constructor(statusCode: number, data: any, message = "Success") {
+        this.statusCode = statusCode;
+        this.data = data;
+        this.message = message;
+        this.success = statusCode < 400;
+    }
+}
+
+export { ApiResponse };
+</file>
+
+<file path="src/utils/generateToken.ts">
+import jwt from "jsonwebtoken";
+
+export const generateToken = (id: string, role: string) => {
+    return jwt.sign({ id, role }, process.env.JWT_SECRET || "default_secret", {
+        expiresIn: "30d", // 30 din tak login rahega
+    });
+};
+</file>
+
+<file path="src/verify_schema.ts">
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+async function main() {
+    console.log('Starting verification...');
+
+    try {
+        // 1. Create two users
+        console.log('Creating users...');
+        const user1 = await prisma.user.create({
+            data: {
+                email: `user1_${Date.now()}@example.com`,
+                username: `user1_${Date.now()}`,
+                password: 'password123',
+                displayName: 'User One',
+            },
+        });
+
+        const user2 = await prisma.user.create({
+            data: {
+                email: `user2_${Date.now()}@example.com`,
+                username: `user2_${Date.now()}`,
+                password: 'password123',
+                displayName: 'User Two',
+            },
+        });
+
+        console.log(`Created users: ${user1.username}, ${user2.username}`);
+
+        // 2. Create a friendship (User 1 requests User 2)
+        console.log('Creating friendship...');
+        const friendship = await prisma.friendship.create({
+            data: {
+                requesterId: user1.id,
+                addresseeId: user2.id,
+                status: 'PENDING',
+            },
+        });
+        console.log(`Friendship created with status: ${friendship.status}`);
+
+        // 3. Send a Snap (User 1 sends to User 2)
+        console.log('Sending a snap...');
+        const snap = await prisma.snap.create({
+            data: {
+                senderId: user1.id,
+                receiverId: user2.id,
+                url: 'https://example.com/snap.jpg',
+                mediaType: 'IMAGE',
+                viewDuration: 10,
+                status: 'SENT',
+            },
+        });
+        console.log(`Snap sent with ID: ${snap.id}`);
+
+        // 4. Verify relations
+        const user1WithSnaps = await prisma.user.findUnique({
+            where: { id: user1.id },
+            include: { sentSnaps: true },
+        });
+
+        if (user1WithSnaps?.sentSnaps.length === 1) {
+            console.log('Verification SUCCESS: User 1 has 1 sent snap.');
+        } else {
+            console.error('Verification FAILED: User 1 sent snap count mismatch.');
+        }
+
+        // Cleanup (optional, but good for repetitive testing)
+        // await prisma.snap.deleteMany();
+        // await prisma.friendship.deleteMany();
+        // await prisma.user.deleteMany();
+
+    } catch (error) {
+        console.error('Verification failed with error:', error);
+        process.exit(1);
+    } finally {
+        await prisma.$disconnect();
+    }
+}
+
+main();
+</file>
+
+<file path="test.ts">
+import "dotenv/config";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+
+async function main() {
+  try {
+    console.log("🔗 Connecting to MongoDB...");
+
+    // Test connection
+    const user = await prisma.user.findFirst();
+    console.log("✅ MongoDB Connection Successful!");
+
+    // Test 1: Create a User
+    console.log("\n📝 Test 1: Creating a User...");
+    const newUser = await prisma.user.create({
+      data: {
+        email: `testuser_${Date.now()}@test.com`,
+        username: `testuser_${Date.now()}`,
+        displayName: "Test User",
+        password: "hashed_password_123",
+        role: "USER",
+      },
+    });
+    console.log("✅ User Created:", newUser.id);
+
+    // Test 2: Read User
+    console.log("\n📖 Test 2: Reading User...");
+    const foundUser = await prisma.user.findUnique({
+      where: { id: newUser.id },
+      include: {
+        sentSnaps: true,
+        receivedSnaps: true,
+        stories: true,
+      },
+    });
+    console.log("✅ User Found:", foundUser?.email);
+
+    // Test 3: Update User
+    console.log("\n✏️ Test 3: Updating User...");
+    const updatedUser = await prisma.user.update({
+      where: { id: newUser.id },
+      data: { displayName: "Updated Test User", score: 100 },
+    });
+    console.log("✅ User Updated:", updatedUser.displayName);
+
+    // Test 4: Create another user for friendship test
+    console.log("\n📝 Test 4: Creating Another User for Friendship...");
+    const anotherUser = await prisma.user.create({
+      data: {
+        email: `frienduser_${Date.now()}@test.com`,
+        username: `frienduser_${Date.now()}`,
+        displayName: "Friend User",
+        password: "hashed_password_456",
+        role: "USER",
+      },
+    });
+    console.log("✅ Friend User Created:", anotherUser.id);
+
+    // Test 5: Create Friendship
+    console.log("\n🤝 Test 5: Creating Friendship...");
+    const friendship = await prisma.friendship.create({
+      data: {
+        requesterId: newUser.id,
+        addresseeId: anotherUser.id,
+        status: "PENDING",
+      },
+    });
+    console.log("✅ Friendship Created:", friendship.id);
+
+    // Test 6: Query with relations
+    console.log("\n🔍 Test 6: Querying User with Relations...");
+    const userWithFriends = await prisma.user.findUnique({
+      where: { id: newUser.id },
+      include: {
+        friends: true,
+        friendOf: true,
+      },
+    });
+    console.log("✅ User with Friends:", userWithFriends?.friends.length);
+
+    // Test 7: Delete User (Cleanup)
+    console.log("\n🗑️ Test 7: Deleting Test Data...");
+    await prisma.friendship.delete({
+      where: { id: friendship.id },
+    });
+    await prisma.user.delete({
+      where: { id: newUser.id },
+    });
+    await prisma.user.delete({
+      where: { id: anotherUser.id },
+    });
+    console.log("✅ Test Data Deleted");
+
+    console.log("\n✨ All Tests Passed Successfully! ✨");
+  } catch (error) {
+    console.error("❌ Error:", error);
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main();
+</file>
+
+<file path="tools/socket-test.js">
+const { io } = require('socket.io-client');
+
+const SERVER = 'http://localhost:5000';
+
+function makeClient(id) {
+  const socket = io(SERVER, { reconnectionDelay: 0, timeout: 20000 });
+  socket.on('connect', () => console.log(`${id} connected -> ${socket.id}`));
+  socket.on('connected', () => console.log(`${id} server ack`));
+  socket.on('message_received', (m) => console.log(`${id} message_received:`, m));
+  socket.on('notification_received', (n) => console.log(`${id} notification_received:`, n));
+  return socket;
+}
+
+(async () => {
+  const A = makeClient('userA');
+  const B = makeClient('userB');
+
+  // wait for both to connect
+  await new Promise((r) => setTimeout(r, 1000));
+
+  A.emit('setup', 'userA');
+  B.emit('setup', 'userB');
+
+  A.emit('join_chat', 'room1');
+  B.emit('join_chat', 'room1');
+
+  // small delay then send message from A to B
+  setTimeout(() => {
+    const payload = { conversationId: 'room1', senderId: 'userA', receiverId: 'userB', content: 'Hello from userA' };
+    console.log('userA emitting new_message:', payload);
+    A.emit('new_message', payload);
+  }, 500);
+
+  // let it run a short while then exit
+  setTimeout(() => {
+    A.disconnect();
+    B.disconnect();
+    console.log('Finished test.');
+    process.exit(0);
+  }, 2500);
+})();
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "module": "commonjs",
+    "target": "es6",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "exclude": ["node_modules", "dist", "prisma.config.ts"]
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "snapify",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.994.0",
+    "@google-cloud/storage": "^7.19.0",
+    "@google/generative-ai": "^0.24.1",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.3",
+    "cloudinary": "^1.41.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
+    "node-cron": "^4.2.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^25.3.0",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.3"
+  }
+}
+</file>
+
+<file path="README.md">
+# snapify
+# snapify
+</file>
+
+<file path="src/app.ts">
+import express from "express";
+import path from "path";
+import cors from "cors";
+
+// Sabhi routes ko import karein
+import authRoutes from "./modules/auth/auth.routes";
+import userRoutes from "./modules/user/user.routes";
+import friendRoutes from "./modules/friend/friend.routes";
+import snapRoutes from "./modules/snap/snap.routes";
+import storyRoutes from "./modules/story/story.routes";
+import chatRoutes from "./modules/chat/chat.routes";
+import messageRoutes from "./modules/message/message.routes";
+import notificationRoutes from "./modules/notification/notification.route";
+import scoreRoutes from "./modules/score/score.routes";
+import reportRoutes from "./modules/report/report.routes";
+import blockRoutes from "./modules/block/block.routes";
+import reactionRoutes from "./modules/reaction/reaction.routes";
+import streakRoutes from "./modules/streak/streak.routes";
+
+const app = express();
+
+// 1. Middlewares
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle karne ke liye
+
+// Serve simple test client and static assets from `public/`
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+// 2. Routes Implementation
+const version = "/api/v1";
+
+app.use(`${version}/auth`, authRoutes);
+app.use(`${version}/users`, userRoutes);
+app.use(`${version}/friends`, friendRoutes);
+app.use(`${version}/snaps`, snapRoutes);
+app.use(`${version}/stories`, storyRoutes);
+app.use(`${version}/chats`, chatRoutes);
+app.use(`${version}/messages`, messageRoutes);
+app.use(`${version}/notifications`, notificationRoutes);
+app.use(`${version}/score`, scoreRoutes);
+app.use(`${version}/reports`, reportRoutes);
+app.use(`${version}/blocks`, blockRoutes);
+app.use(`${version}/reactions`, reactionRoutes);
+app.use(`${version}/streaks`, streakRoutes);
+
+// 3. Health Check
+app.get("/", (_req, res) => {
+  res.send("Snapify Backend is Live! 🚀");
+});
+
+// Simple route to serve the test client (also available at /test-client.html)
+app.get("/test-client", (_req, res) => {
+  res.sendFile(path.join(__dirname, "..", "public", "test-client.html"));
+});
+
+// 4. Global Error Handler (Optional but helpful)
+app.use((err: any, req: any, res: any, next: any) => {
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  });
+});
+
+export default app;
+</file>
+
+<file path="src/config/cloudinary.ts">
+import { v2 as cloudinary } from "cloudinary";
+import dotenv from "dotenv";
+
+dotenv.config(); // Ye line yahan add kar do safety ke liye
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+export default cloudinary;
+</file>
+
+<file path="src/modules/friend/friend.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class FriendController {
+  // 1. Friend Request Bhejna
+  async sendRequest(req: AuthRequest, res: Response) {
+    try {
+      const { addresseeId } = req.body;
+      const requesterId = req.user?.id;
+
+      if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
+
+      if (requesterId === addresseeId) {
+        return res.status(400).json({ message: "Bhai, khud ko add nahi kar sakte!" });
+      }
+
+      // Check karo kahin pehle se toh request nahi bheji?
+      const existingRequest = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId, addresseeId },
+            { requesterId: addresseeId, addresseeId: requesterId }
+          ]
+        }
+      });
+
+      if (existingRequest) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Request pehle se bheji ja chuki hai ya aap pehle se dost hain!" 
+        });
+      }
+
+      const friendship = await prisma.friendship.create({
+        data: {
+          requesterId,
+          addresseeId,
+          status: "PENDING",
+        },
+      });
+
+      // Notification logic
+      await prisma.notification.create({
+        data: {
+          type: "FRIEND_REQUEST",
+          content: `Aapko ek nayi friend request aayi hai!`,
+          senderId: requesterId,
+          receiverId: addresseeId,
+        },
+      });
+
+      res.status(201).json({ success: true, data: friendship });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Friend Request Accept Karna
+  async acceptRequest(req: AuthRequest, res: Response) {
+    try {
+      // Yahan Type casting (as string) add kar di hai
+      const requestId = req.params.requestId as string; 
+      const myId = req.user?.id;
+console.log("Accepting Request ID:", requestId); // Ye line dalo
+    // ... baaki code
+      if (!requestId) {
+          return res.status(400).json({ message: "Request ID zaroori hai!" });
+      }
+
+      // Pehle check karo request exists aur mere liye hi hai?
+      const checkRequest = await prisma.friendship.findUnique({
+        where: { id: requestId } // Ab ye error nahi dega
+      });
+
+      if (!checkRequest || checkRequest.addresseeId !== myId) {
+        return res.status(404).json({ message: "Request nahi mili ya aap ise accept nahi kar sakte!" });
+      }
+
+      const friendship = await prisma.friendship.update({
+        where: { id: requestId }, // Yahan bhi error fix ho jayega
+        data: { status: "ACCEPTED" },
+      });
+  
+  
+
+      // Notification logic...
+      await prisma.notification.create({
+        data: {
+          type: "REQUEST_ACCEPTED",
+          content: `Aapki friend request accept kar li gayi hai! ✨`,
+          senderId: myId!,
+          receiverId: friendship.requesterId,
+        },
+      });
+
+      res.status(200).json({ success: true, message: "Ab aap dost hain!" });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+  // 3. Mere saare doston ki list dekhna
+  async getFriendsList(req: AuthRequest, res: Response) {
+    try {
+      const myId = req.user?.id;
+
+      const friendshipData = await prisma.friendship.findMany({
+        where: {
+          OR: [
+            { requesterId: myId, status: "ACCEPTED" },
+            { addresseeId: myId, status: "ACCEPTED" }
+          ]
+        },
+        include: {
+          requester: { select: { id: true, username: true, avatarUrl: true, displayName: true } },
+          addressee: { select: { id: true, username: true, avatarUrl: true, displayName: true } }
+        }
+      });
+
+      // Data ko thoda clean kar dete hain taaki frontend ko sirf "Dost" ka object mile
+      const friends = friendshipData.map(f => {
+        return f.requesterId === myId ? f.addressee : f.requester;
+      });
+
+      res.status(200).json({ success: true, data: friends });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/reaction/reaction.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class ReactionController {
+async toggleReaction(req: AuthRequest, res: Response) {
+  try {
+    const { messageId, emoji } = req.body;
+    const userId = req.user?.id;
+    const io = req.app.get("socketio");
+
+    // 🔥 MAGIC LINES: Agar ID database wali nahi hai, toh seedha socket chala do
+    // Isse aapka niche ka Prisma code crash nahi hoga
+    if (messageId.startsWith("msg-")) {
+        if (io) io.emit("reaction_updated", { messageId, emoji, actionType: "ADDED" });
+        return res.status(200).json({ success: true, message: "Socket updated" });
+    }
+
+      // 1. Message check karo
+      // Note: messageId as string use kiya hai Type Error hatane ke liye
+      const message = await prisma.message.findUnique({
+        where: { id: messageId as string },
+        select: { conversationId: true, senderId: true },
+      });
+
+      if (!message) {
+        return res.status(404).json({ success: false, message: "Message nahi mila" });
+      }
+
+      // 2. Check existing reaction
+      const existingReaction = await prisma.reaction.findUnique({
+        where: {
+          userId_messageId: {
+            userId: userId!,
+            messageId: messageId as string,
+          },
+        },
+      });
+
+      let actionType: "ADDED" | "REMOVED" | "UPDATED";
+      let finalData;
+
+      if (existingReaction) {
+        if (existingReaction.emoji === emoji) {
+          await prisma.reaction.delete({ where: { id: existingReaction.id } });
+          actionType = "REMOVED";
+          finalData = { message: "Removed" };
+        } else {
+          const updated = await prisma.reaction.update({
+            where: { id: existingReaction.id },
+            data: { emoji },
+          });
+          actionType = "UPDATED";
+          finalData = { data: updated };
+        }
+      } else {
+        const newReaction = await prisma.reaction.create({
+          data: {
+            emoji,
+            userId: userId!,
+            messageId: messageId as string,
+          },
+        });
+        actionType = "ADDED";
+        finalData = { data: newReaction };
+      }
+
+      // --- ⚡ SOCKET REAL-TIME UPDATE ---
+      if (io) {
+        io.to(message.conversationId).emit("reaction_updated", {
+          messageId,
+          emoji,
+          userId,
+          actionType,
+        });
+
+        if (message.senderId !== userId && actionType !== "REMOVED") {
+          await prisma.notification.create({
+            data: {
+              type: "REACTION",
+              content: `Someone reacted ${emoji} to your message`,
+              senderId: userId!,
+              receiverId: message.senderId,
+            },
+          });
+
+          io.to(message.senderId).emit("notification_received", {
+            title: "New Reaction!",
+            message: `Someone reacted ${emoji} to your message`,
+          });
+        }
+      }
+
+      return res.status(200).json({ success: true, ...finalData, actionType });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getMessageReactions(req: AuthRequest, res: Response) {
+    try {
+      const { messageId } = req.params;
+
+      // FIX: messageId ko explicitly string mein convert kiya Type Error hatane ke liye
+      const idToSearch = Array.isArray(messageId) ? messageId[0] : messageId;
+
+      const reactions = await prisma.reaction.findMany({
+        where: { messageId: idToSearch },
+        include: {
+          user: { select: { username: true, avatarUrl: true } },
+        },
+      });
+      res.status(200).json({ success: true, data: reactions });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+}
+</file>
+
+<file path="src/modules/reaction/reaction.routes.ts">
+import { Router } from "express";
+import { ReactionController } from "./reaction.controller";
+import { protect } from "../../middlewares/auth.middleware";
+
+const router = Router();
+const reactionController = new ReactionController();
+
+//router.use(protect);
+
+// POST: reaction toggle karne ke liye (Body mein messageId aur emoji jayega)
+router.post("/toggle", reactionController.toggleReaction);
+
+// GET: kisi message ke saare reactions dekhne ke liye
+router.get("/:messageId", reactionController.getMessageReactions);
+
+export default router;
+</file>
+
+<file path="src/modules/report/report.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class ReportController {
+  // 1. Submit Report
+  async submitReport(req: AuthRequest, res: Response) {
+    try {
+      const { 
+        reason, 
+        description, 
+        reportedUserId, 
+        reportedSnapId, 
+        reportedStoryId 
+      } = req.body;
+      
+      const reporterId = req.user?.id;
+
+      if (!reason) {
+        return res.status(400).json({ success: false, message: "Reason dena zaroori hai!" });
+      }
+
+      const report = await prisma.report.create({
+        data: {
+          reason,
+          description,
+          reporterId: reporterId!,
+          reportedUserId: reportedUserId || null,
+          reportedSnapId: reportedSnapId || null,
+          reportedStoryId: reportedStoryId || null,
+        },
+      });
+
+      res.status(201).json({ success: true, data: report });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 2. Get All Reports
+  async getReports(req: AuthRequest, res: Response) {
+    try {
+      const reports = await prisma.report.findMany({
+        include: {
+          reporter: { select: { id: true, username: true } },
+          reportedUser: { select: { id: true, username: true } },
+          reportedSnap: true,
+          reportedStory: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      res.status(200).json({ success: true, data: reports });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // 3. Update Status (TypeScript Error Fixed & Existence Check Integrated)
+  async updateReportStatus(req: AuthRequest, res: Response) {
+    try {
+      const { reportId } = req.params;
+      const { status } = req.body;
+
+      if (!reportId) {
+        return res.status(400).json({ success: false, message: "ID missing hai" });
+      }
+
+      // 1. Pehle check karo ki kya ye report exist karti bhi hai?
+      const existingReport = await prisma.report.findUnique({
+        where: { id: reportId as string } 
+      });
+
+      if (!existingReport) {
+        return res.status(404).json({ 
+          success: false, 
+          message: `Bhai, report ID (${reportId}) database mein nahi mili!` 
+        });
+      }
+
+      // 2. Agar mil gayi, toh update karo
+      const updatedReport = await prisma.report.update({
+        where: { id: reportId as string },
+        data: { status: status as any },
+      });
+
+      res.status(200).json({ success: true, data: updatedReport });
+    } catch (error: any) {
+      console.error("Update Error:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+} // <--- Ye wala bracket zaroori tha class ko band karne ke liye
+</file>
+
+<file path="src/modules/snap/snap.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+import { ApiError } from "../../utils/ApiError";
+import { ApiResponse } from "../../utils/ApiResponse";
+import { StreakController } from "../streak/streak.controller"; 
+
+export class SnapController {
+  // 1. Send Snap
+  async sendSnap(req: AuthRequest, res: Response) {
+    try {
+      const { receiverId, viewDuration, mediaType } = req.body;
+      const senderId = req.user?.id;
+      const file = req.file;
+
+      if (!file) throw new ApiError(400, "Snap file upload nahi hui!");
+      if (!receiverId) throw new ApiError(400, "Receiver ID missing hai.");
+
+      const snap = await prisma.snap.create({
+        data: {
+          url: file.path,
+          mediaType: mediaType === "VIDEO" ? "VIDEO" : "IMAGE",
+          viewDuration: parseInt(viewDuration) || 10,
+          senderId: senderId!,
+          receiverId: receiverId,
+          status: "SENT",
+        },
+      });
+
+      await prisma.user.update({
+        where: { id: senderId },
+        data: { score: { increment: 1 } }
+      });
+
+     // Snap bhejte hi streak update call karo
+await StreakController.updateStreak(senderId!, receiverId);
+
+      return res.status(201).json(new ApiResponse(201, snap, "Snap bhej di gayi!"));
+    } catch (error: any) {
+      res.status(error.statusCode || 500).json(new ApiResponse(error.statusCode || 500, null, error.message));
+    }
+  }
+
+  // 2. Get My Snaps
+  getMySnaps = async (req: AuthRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const snaps = await prisma.snap.findMany({
+        where: { receiverId: userId, status: "SENT" },
+        include: { 
+          sender: { select: { username: true, displayName: true } } 
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return res.status(200).json(new ApiResponse(200, snaps, "Snaps fetched!"));
+    } catch (error: any) {
+      res.status(500).json(new ApiResponse(500, null, error.message));
+    }
+  };
+
+  // 3. Open Snap (Fixed Logic)
+  openSnap = async (req: AuthRequest, res: Response) => {
+    try {
+      const { snapId } = req.params;
+      
+      const updatedSnap = await prisma.snap.update({
+        where: { 
+          id: snapId as string // Yahan 'id' aayega, aur snapId as string bahar
+        },
+        data: { 
+          status: "OPENED", 
+          openedAt: new Date() 
+        }
+      });
+
+      return res.status(200).json(new ApiResponse(200, updatedSnap, "Snap marked as OPENED!"));
+    } catch (error: any) {
+      console.error("Open Snap Error:", error);
+      res.status(500).json(new ApiResponse(500, null, "Snap ID galat hai ya snap nahi mili."));
+    }
+  };
+}
+</file>
+
+<file path="src/modules/snap/snap.routes.ts">
+import { Router } from "express";
+import { SnapController } from "./snap.controller";
+import upload from "../../uploads/upload.middleware"; 
+import { protect } from "../../middlewares/auth.middleware"; 
+
+const router = Router();
+const snapController = new SnapController();
+
+// 1. Snap bhejne ke liye
+router.post(
+  "/send", 
+  protect, 
+  upload.single("file"), 
+  snapController.sendSnap
+);
+
+// 2. Apni snaps dekhne ke liye (GET request)
+router.get("/my-snaps", protect, snapController.getMySnaps);
+
+// 3. Snap open karne ke liye (PATCH request)
+// Dhyaan rakhna URL mein :snapId dynamic parameter hai
+router.patch("/open/:snapId", protect, snapController.openSnap);
+
+export default router;
+</file>
+
+<file path="src/modules/streak/streak.controller.ts">
+import { Response } from "express";
+import prisma from "../../config/prisma";
+import { AuthRequest } from "../../middlewares/auth.middleware";
+
+export class StreakController {
+  // 1. User ki saari active streaks dekhna (API Endpoint)
+  async getMyStreaks(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+
+      const friendships = await prisma.friendship.findMany({
+        where: {
+          OR: [{ requesterId: userId }, { addresseeId: userId }],
+          status: "ACCEPTED",
+          streak: { gt: 0 },
+        },
+        include: {
+          requester: { select: { username: true, avatarUrl: true } },
+          addressee: { select: { username: true, avatarUrl: true } },
+        },
+      });
+
+      res.status(200).json({ success: true, data: friendships });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  /**
+   * 2. Streak Update Logic (Internal Static Function)
+   * Isko SnapController se call karte hain.
+   */
+  static async updateStreak(senderId: string, receiverId: string) {
+    try {
+      const now = new Date();
+      // TESTING: sirf 1 second ka gap rakha hai taaki Postman pe turant result dikhe
+      const minGap = 1000; 
+      const oneDayInMs = 24 * 60 * 60 * 1000;
+      const twoDaysInMs = 48 * 60 * 60 * 1000;
+
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { requesterId: senderId, addresseeId: receiverId },
+            { requesterId: receiverId, addresseeId: senderId },
+          ],
+          status: "ACCEPTED",
+        },
+      });
+
+      if (!friendship) {
+        console.log("Friendship status 'ACCEPTED' nahi mili.");
+        return;
+      }
+
+      const lastInteraction = new Date(friendship.lastInteraction).getTime();
+      const timeDiff = now.getTime() - lastInteraction;
+
+      // --- STREAK LOGIC ---
+
+      if (timeDiff < minGap) {
+        // Bahut jaldi snap bhej di (Dhyan rakho: Real app mein yahan 24h ka gap hona chahiye)
+        console.log("Wait for a few seconds to update streak again!");
+        return;
+      } 
+      else if (timeDiff >= minGap && timeDiff < twoDaysInMs) {
+        // Streak badhao
+        await prisma.friendship.update({
+          where: { id: friendship.id },
+          data: {
+            streak: { increment: 1 },
+            lastInteraction: now,
+          },
+        });
+
+        // Bonus: Dono users ka score +10
+        await prisma.user.updateMany({
+          where: { id: { in: [senderId, receiverId] } },
+          data: { score: { increment: 10 } },
+        });
+
+        console.log("🔥 Streak Incremented and Score +10!");
+      } 
+      else {
+        // 48 hours se zyada ho gaye -> Streak Tut Gayi
+        await prisma.friendship.update({
+          where: { id: friendship.id },
+          data: {
+            streak: 0,
+            lastInteraction: now,
+          },
+        });
+        console.log("💀 Streak Reset to 0 (Too much gap)");
+      }
+    } catch (error) {
+      console.error("Streak Update Error:", error);
+    }
+  }
+}
+</file>
+
+<file path="src/server.ts">
+// 1. SABSE PEHLE env load karo - baaki kisi bhi import se pehle
+require('dotenv').config(); 
+
+import http from "http";
+import { Server } from "socket.io";
+// 2. Ab app aur baaki cheezein import karo
+import app from "./app"; 
+import { chatHandler } from "./sockets/chat.socket";
+
+const PORT = process.env.PORT || 5001;
+
+// HTTP Server banana
+const server = http.createServer(app);
+
+// Socket.io Initialize karna
+const io = new Server(server, {
+  pingTimeout: 60000,
+  cors: {
+    origin: "*", // Development ke liye sab allowed hai
+    methods: ["GET", "POST"],
+  },
+});
+
+// Cloudinary connection test (Sirf debug ke liye)
+console.log("Cloudinary Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME);
+
+// Socket Connection Handling
+io.on("connection", (socket) => {
+  console.log(`Connected to socket.io ✅ ID: ${socket.id}`);
+  
+  // Chat handler ko io instance pass karna zaroori hai agar aapko notifications bhejni hain
+  chatHandler(io, socket);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected ❌");
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server chalu ho gaya hai: http://localhost:${PORT}`);
+});
+
+process.on("SIGINT", async () => {
+  process.exit(0);
+});
+</file>
+
+<file path="src/sockets/chat.socket.ts">
+import { Server, Socket } from "socket.io";
+
+export const chatHandler = (io: Server, socket: Socket) => {
+  
+  // 1. SETUP: Jab user app kholta hai, wo apne naam ke room mein baith jata hai
+  socket.on("setup", (userId: string) => {
+    if (!userId) return;
+    const cleanUserId = userId.toString().trim().replace(/['"]+/g, '');
+    socket.join(cleanUserId); 
+    console.log(`✅ ${cleanUserId} is online (for personal chats)`);
+  });
+
+  // 2. JOIN GROUP: Jab user kisi group chat par click karta hai
+  socket.on("join_chat", (groupId: string) => {
+    if (!groupId) return;
+    const cleanGroupId = groupId.toString().trim().replace(/['"]+/g, '');
+    socket.join(cleanGroupId);
+    console.log(`🏠 User entered Group Room: ${cleanGroupId}`);
+  });
+
+  // 3. PERSONAL LOGIC (Direct to Person)
+  socket.on("new_message", (payload: any) => {
+    const { senderId, content, receiverId, messageId } = payload;
+    const cleanReceiverId = receiverId?.toString().trim();
+
+    if (!cleanReceiverId) {
+      console.warn('new_message missing receiverId:', payload);
+      return;
+    }
+
+    // Us bande ki personal ID par message aur notification bhejo
+    io.to(cleanReceiverId).emit("message_received", { senderId, content, receiverId: cleanReceiverId, messageId });
+    io.to(cleanReceiverId).emit("notification_received", {
+      title: `Private Snap from ${senderId}`,
+      message: content,
+      receiverId: cleanReceiverId
+    });
+    console.log(`👤 Private: ${senderId} -> ${cleanReceiverId}`);
+  });
+
+  // 4. GROUP LOGIC (Broadcast to Room)
+  socket.on("new_group_message", (payload: any) => {
+    const { groupId, senderId, senderName, content, messageId } = payload;
+    const cleanGroupId = groupId?.trim();
+
+    // Poore group room mein message aur notification bhejo (Except sender)
+    socket.to(cleanGroupId).emit("group_message_received", {
+      senderName,
+      content,
+      groupId: cleanGroupId,
+      messageId
+    });
+
+    socket.to(cleanGroupId).emit("notification_received", {
+      title: `Group: ${cleanGroupId}`,
+      message: `${senderName}: ${content}`
+    });
+    console.log(`👥 Group: ${senderName} sent msg to ${cleanGroupId}`);
+  });
+
+  // ⚡ 5. REACTION LOGIC (Personal + Group Broadcast)
+  // Amit double click karega toh ye event chalega aur Ravin ko dikhayega
+  socket.on("send_reaction", (payload: any) => {
+    const { messageId, emoji, userId, roomId, actionType } = payload;
+    
+    if (!roomId) return;
+    const cleanRoomId = roomId.toString().trim().replace(/['"]+/g, '');
+
+    // socket.to(room) ka matlab sender ko chhod kar room mein baaki sabko bhej do
+    socket.to(cleanRoomId).emit("reaction_updated", {
+      messageId,
+      emoji,
+      userId,
+      actionType // "ADDED" ya "REMOVED"
+    });
+
+    console.log(`❤️ Reaction: ${userId} ${actionType} ${emoji} on ${messageId} in room ${cleanRoomId}`);
+  });
+};
+</file>
+
+<file path="src/sockets/notification.socket.ts">
+import { Server, Socket } from "socket.io";
+
+export const notificationHandler = (io: Server, socket: Socket) => {
+  // User ko uske "Personal ID" wale room mein join karwana
+  socket.on("setup_notifications", (userId: string) => {
+    const cleanUserId = userId.toString().replace(/['"]+/g, '');
+    socket.join(cleanUserId);
+    console.log(`🔔 Notifications active for: ${cleanUserId}`);
+  });
+
+  // Jab koi naya message aaye, toh receiver ko personal alert bhejna
+  socket.on("send_notification", (data: any) => {
+    const { receiverId, senderName, content } = data;
+    
+    // Sirf us bande ko bhejona jiski ID receiverId hai
+    socket.to(receiverId).emit("notification_received", {
+      title: `New Snap from ${senderName}`,
+      message: content,
+      time: new Date()
+    });
+  });
+};
+</file>
+
+</files>

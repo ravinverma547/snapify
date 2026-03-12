@@ -1,0 +1,245 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+// prisma generate karne ke baad, aapko apne database mein collections aur indexes create karne ke liye `prisma db push` command chalana hoga. Yeh command aapke schema ke hisaab se database ko update karega.
+generator client {
+  provider = "prisma-client-js"
+}
+  // par agar aapka setup purana hai toh yahan url = env("DATABASE_URL") wapas daal sakte ho.
+
+
+model User {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  email         String    @unique
+  username      String    @unique
+  displayName   String?
+  role          Role      @default(USER)
+  password      String
+  avatarUrl     String?
+  bitmojiData   String?
+  score         Int       @default(0)
+  streak        Int       @default(0)
+  lastActiveAt  DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Snaps & Stories
+  sentSnaps     Snap[]    @relation("Sender")
+  receivedSnaps Snap[]    @relation("Receiver")
+  stories       Story[]
+  storyViews    StoryView[]
+
+  // Friends & Messages
+  friends       Friendship[] @relation("UserFriends")
+  friendOf      Friendship[] @relation("FriendUsers")
+  sentMessages  Message[]    @relation("MessageSender")
+  
+  // Reactions & Notifications
+  reactions     Reaction[]   @relation("UserReactions")
+  sentNotifications     Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationReceiver")
+
+  // Conversations
+  conversationIds String[]       @db.ObjectId
+  conversations   Conversation[] @relation(fields: [conversationIds], references: [id])
+
+  // --- Reports (Opposite Relations Fixed) ---
+  reportsSent     Report[] @relation("Reporter")
+  reportsReceived Report[] @relation("ReportedUser")
+}
+
+model Friendship {
+  id          String           @id @default(auto()) @map("_id") @db.ObjectId
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+streak          Int              @default(0)
+  lastInteraction DateTime         @default(now())
+  
+    requester   User   @relation("UserFriends", fields: [requesterId], references: [id])
+  requesterId String @db.ObjectId
+
+  addressee   User   @relation("FriendUsers", fields: [addresseeId], references: [id])
+  addresseeId String @db.ObjectId
+
+
+  @@unique([requesterId, addresseeId])
+}
+
+model Snap {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  url          String
+  mediaType    MediaType
+  viewDuration Int        @default(10)
+  status       SnapStatus @default(SENT)
+  expiresAt    DateTime?
+  openedAt     DateTime?
+  createdAt    DateTime   @default(now())
+
+  sender       User   @relation("Sender", fields: [senderId], references: [id])
+  senderId     String @db.ObjectId
+
+  receiver     User   @relation("Receiver", fields: [receiverId], references: [id])
+  receiverId   String @db.ObjectId
+
+  // --- Relation Fixed ---
+  reports      Report[]
+}
+
+model Story {
+  id        String       @id @default(auto()) @map("_id") @db.ObjectId
+  url       String
+  mediaType MediaType
+  expiresAt DateTime
+  privacy   StoryPrivacy @default(FRIENDS)
+  createdAt DateTime     @default(now())
+
+  author    User   @relation(fields: [authorId], references: [id])
+  authorId  String @db.ObjectId
+
+  views     StoryView[]
+
+  // --- Relation Fixed ---
+  reports   Report[]
+}
+
+model StoryView {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  viewedAt DateTime @default(now())
+
+  story    Story  @relation(fields: [storyId], references: [id])
+  storyId  String @db.ObjectId
+
+  viewer   User   @relation(fields: [viewerId], references: [id])
+  viewerId String @db.ObjectId
+
+  @@unique([storyId, viewerId])
+}
+
+model Conversation {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  isGroup        Boolean  @default(false)
+  name           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages       Message[]
+
+  participantIds String[] @db.ObjectId
+  participants   User[]   @relation(fields: [participantIds], references: [id])
+
+  adminIds       String[] @db.ObjectId
+}
+
+model Message {
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  content         String?
+  mediaUrl        String?
+  type            MessageType @default(TEXT)
+  isSystemMessage Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+
+  sender          User   @relation("MessageSender", fields: [senderId], references: [id])
+  senderId        String @db.ObjectId
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id])
+  conversationId  String       @db.ObjectId
+
+  reactions       Reaction[] @relation("MessageReactions")
+  isSavedBy       String[]   @db.ObjectId
+}
+
+model Reaction {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  emoji     String
+  createdAt DateTime @default(now())
+
+  user      User     @relation("UserReactions", fields: [userId], references: [id])
+  userId    String   @db.ObjectId
+
+  message   Message  @relation("MessageReactions", fields: [messageId], references: [id])
+  messageId String   @db.ObjectId
+
+  @@unique([userId, messageId])
+}
+
+model Notification {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  type        String   
+  content     String
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("NotificationSender", fields: [senderId], references: [id])
+  senderId    String   @db.ObjectId
+
+  receiver    User     @relation("NotificationReceiver", fields: [receiverId], references: [id])
+  receiverId  String   @db.ObjectId
+}
+
+model Report {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  reason      String      
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime    @default(now())
+
+  reporter    User     @relation("Reporter", fields: [reporterId], references: [id])
+  reporterId  String   @db.ObjectId
+
+  reportedUser   User?   @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reportedUserId String? @db.ObjectId
+
+  reportedSnap   Snap?   @relation(fields: [reportedSnapId], references: [id])
+  reportedSnapId String? @db.ObjectId
+
+  reportedStory  Story?  @relation(fields: [reportedStoryId], references: [id])
+  reportedStoryId String? @db.ObjectId
+}
+
+// --- ENUMS ---
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum SnapStatus {
+  SENT
+  DELIVERED
+  OPENED
+  REPLAYED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+}
+
+enum StoryPrivacy {
+  PUBLIC
+  FRIENDS
+  PRIVATE
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
