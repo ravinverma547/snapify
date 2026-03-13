@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import app from "./app"; 
 import { chatHandler } from "./sockets/chat.socket";
 import prisma from "./config/prisma";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { storyCleanupJob } from "./jobs/storyCleanup";
 import { snapCleanupJob } from "./jobs/snapCleanup";
 
@@ -18,8 +18,17 @@ const server = http.createServer(app);
 const io = new Server(server, {
   pingTimeout: 60000,
   cors: {
-    origin: "*", // Development ke liye sab allowed hai
+    origin: (origin, callback) => {
+      // allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+      if (origin.includes("vercel.app") || origin.includes("localhost") || origin.includes("onrender.com")) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
+    credentials: true
   },
 });
 
@@ -42,8 +51,7 @@ io.on("connection", (socket) => {
 });
 
 server.listen(PORT, async () => {
-  // console.log(`🚀 Server chalu ho gaya hai: http://localhost:${PORT}`);
-  console.log(`🚀 Server running successfully: https://snapify-backend-o0yt.onrender.com/${PORT}`);
+  console.log(`🚀 Server running successfully: https://snapify-backend-o0yt.onrender.com:${PORT}`);
   
   // Create or Update 'My AI' user
   try {
@@ -76,3 +84,5 @@ server.listen(PORT, async () => {
 process.on("SIGINT", async () => {
   process.exit(0);
 });
+
+export default app;

@@ -20,42 +20,41 @@ export const chatHandler = (io: Server, socket: Socket) => {
 
   // 3. PERSONAL LOGIC (Direct to Person)
   socket.on("new_message", (payload: any) => {
-    const { senderId, content, receiverId, messageId } = payload;
+    const { senderId, content, receiverId, messageId, roomId } = payload;
     const cleanReceiverId = receiverId?.toString().trim();
+    const cleanRoomId = roomId?.toString().trim();
 
-    if (!cleanReceiverId) {
-      console.warn('new_message missing receiverId:', payload);
-      return;
+    if (cleanRoomId) {
+      // Broadcast to everyone in the conversation room
+      io.to(cleanRoomId).emit("message_received", { ...payload, roomId: cleanRoomId });
+    } else if (cleanReceiverId) {
+      // Fallback for notifications if room not joined
+      io.to(cleanReceiverId).emit("message_received", { ...payload });
     }
 
-    // Us bande ki personal ID par message aur notification bhejo
-    io.to(cleanReceiverId).emit("message_received", { senderId, content, receiverId: cleanReceiverId, messageId });
-    io.to(cleanReceiverId).emit("notification_received", {
-      title: `Private Snap from ${senderId}`,
-      message: content,
-      receiverId: cleanReceiverId
-    });
-    console.log(`👤 Private: ${senderId} -> ${cleanReceiverId}`);
+    if (cleanReceiverId) {
+      io.to(cleanReceiverId).emit("notification_received", {
+        title: `Private Snap from ${senderId}`,
+        message: content,
+        receiverId: cleanReceiverId
+      });
+    }
+    console.log(`👤 Msg: ${senderId} -> Room: ${cleanRoomId || cleanReceiverId}`);
   });
 
   // 4. GROUP LOGIC (Broadcast to Room)
   socket.on("new_group_message", (payload: any) => {
-    const { groupId, senderId, senderName, content, messageId } = payload;
-    const cleanGroupId = groupId?.trim();
+    const { roomId, groupId, senderId, senderName, content, messageId } = payload;
+    const id = (roomId || groupId)?.toString().trim();
 
-    // Poore group room mein message aur notification bhejo (Except sender)
-    socket.to(cleanGroupId).emit("group_message_received", {
-      senderName,
-      content,
-      groupId: cleanGroupId,
-      messageId
-    });
-
-    socket.to(cleanGroupId).emit("notification_received", {
-      title: `Group: ${cleanGroupId}`,
-      message: `${senderName}: ${content}`
-    });
-    console.log(`👥 Group: ${senderName} sent msg to ${cleanGroupId}`);
+    if (id) {
+      io.to(id).emit("message_received", { ...payload, roomId: id });
+      socket.to(id).emit("notification_received", {
+        title: `Group: ${senderName}`,
+        message: content
+      });
+    }
+    console.log(`👥 Group: ${senderName} sent msg to ${id}`);
   });
 
   // ⚡ 5. REACTION LOGIC (Personal + Group Broadcast)

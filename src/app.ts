@@ -21,16 +21,34 @@ import streakRoutes from "./modules/streak/streak.routes";
 const app = express();
 
 // 1. Middlewares
-// app.use(cors());
-// app.use(cors({
-//   origin: "https://snapifyy.vercel.app",
-//   credentials: true
-// }));
-app.use(cors({
-  origin: "https://snapifyy.vercel.app",
-  credentials: true,
-  methods: ["GET","POST","PUT","DELETE"],
-}));
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://snapify-eight-zeta.vercel.app",
+    "https://snapify-backend-o0yt.onrender.com",
+    "http://localhost:5001",
+    "http://localhost:5173"
+  ];
+
+  if (origin) {
+    if (allowedOrigins.includes(origin) || origin.includes("vercel.app")) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      console.log(`[CORS] Allowed: ${origin}`);
+    } else {
+      console.log(`[CORS] Blocked: ${origin}`);
+    }
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle karne ke liye
 
@@ -38,22 +56,23 @@ app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle kar
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // 2. Routes Implementation
-const version = "/api/v1";
+const API_VERSION = "/api/v1";
 
-app.use(`${version}/auth`, authRoutes);
-app.use(`${version}/users`, userRoutes);
-app.use(`${version}/friends`, friendRoutes);
-app.use(`${version}/snaps`, snapRoutes);
-app.use(`${version}/stories`, storyRoutes);
-app.use(`${version}/chats`, chatRoutes);
-app.use(`${version}/groups`, groupRoutes);
-app.use(`${version}/messages`, messageRoutes);
-app.use(`${version}/notifications`, notificationRoutes);
-app.use(`${version}/score`, scoreRoutes);
-app.use(`${version}/reports`, reportRoutes);
-app.use(`${version}/blocks`, blockRoutes);
-app.use(`${version}/reactions`, reactionRoutes);
-app.use(`${version}/streaks`, streakRoutes);
+app.use(`${API_VERSION}/auth`, authRoutes);
+app.use(`${API_VERSION}/users`, userRoutes);
+app.use(`${API_VERSION}/friends`, friendRoutes);
+app.use(`${API_VERSION}/snaps`, snapRoutes);
+app.use(`${API_VERSION}/stories`, storyRoutes);
+app.use(`${API_VERSION}/chats`, chatRoutes);
+ // This might be wrong in the source, checking...
+app.use(`${API_VERSION}/groups`, groupRoutes);
+app.use(`${API_VERSION}/messages`, messageRoutes);
+app.use(`${API_VERSION}/notifications`, notificationRoutes);
+app.use(`${API_VERSION}/score`, scoreRoutes);
+app.use(`${API_VERSION}/reports`, reportRoutes);
+app.use(`${API_VERSION}/blocks`, blockRoutes);
+app.use(`${API_VERSION}/reactions`, reactionRoutes);
+app.use(`${API_VERSION}/streaks`, streakRoutes);
 
 // 3. Health Check
 app.get("/", (_req, res) => {
@@ -67,6 +86,7 @@ app.get("/test-client", (_req, res) => {
 
 // 4. Global Error Handler (Optional but helpful)
 app.use((err: any, req: any, res: any, next: any) => {
+  console.error("Global Error Handler:", err);
   const statusCode = err.statusCode || 500;
   res.status(statusCode).json({
     success: false,

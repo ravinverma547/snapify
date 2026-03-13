@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../../config/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
-const prisma = new PrismaClient();
 
 // --- REGISTER ---
 export const register = async (req: Request, res: Response) => {
@@ -35,6 +33,7 @@ export const register = async (req: Request, res: Response) => {
 
         res.status(201).json({ success: true, message: "User registered successfully" });
     } catch (error: any) {
+        console.error("Registration Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
@@ -82,6 +81,7 @@ export const login = async (req: Request, res: Response) => {
             }
         });
     } catch (error: any) {
+        console.error("Login Error:", error);
         res.status(500).json({ success: false, message: error.message });
     }
 };
