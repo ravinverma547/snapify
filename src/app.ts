@@ -21,32 +21,31 @@ import streakRoutes from "./modules/streak/streak.routes";
 const app = express();
 
 // 1. Middlewares
-const allowedOrigins = [
-  "https://snapify-eight-zeta.vercel.app",
-  "https://snapifyy.vercel.app",
-  "https://snapify-backend-o0yt.onrender.com",
-  "http://localhost:5001",
-  "http://localhost:5173"
-];
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://snapify-eight-zeta.vercel.app",
+    "https://snapifyy.vercel.app",
+    "https://snapify-backend-o0yt.onrender.com",
+    "http://localhost:5001",
+    "http://localhost:5173"
+  ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes("vercel.app")) {
-      callback(null, true);
-    } else {
-      console.log("CORS Blocked for origin:", origin);
-      callback(new Error("Not allowed by CORS"));
+  if (origin) {
+    if (allowedOrigins.includes(origin) || origin.includes("vercel.app")) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
     }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  credentials: true
-}));
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-// Robust preflight handling
-app.options('*', cors());
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Form-data (Snaps) handle karne ke liye
 
