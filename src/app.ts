@@ -25,7 +25,6 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
     "https://snapify-eight-zeta.vercel.app",
-    "https://snapifyy.vercel.app",
     "https://snapify-backend-o0yt.onrender.com",
     "http://localhost:5001",
     "http://localhost:5173"
@@ -34,6 +33,9 @@ app.use((req, res, next) => {
   if (origin) {
     if (allowedOrigins.includes(origin) || origin.includes("vercel.app")) {
       res.setHeader('Access-Control-Allow-Origin', origin);
+      console.log(`[CORS] Allowed: ${origin}`);
+    } else {
+      console.log(`[CORS] Blocked: ${origin}`);
     }
   }
   
