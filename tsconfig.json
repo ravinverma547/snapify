@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "rootDir": "./src",
     "outDir": "./dist",
     "module": "commonjs",
     "target": "es6",
@@ -11,5 +10,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
+  "include": ["src/**/*", "api/**/*"],
   "exclude": ["node_modules", "dist", "prisma.config.ts", "test.ts", "src/verify_schema.ts"]
 }

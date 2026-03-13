@@ -5,7 +5,7 @@ import { Server } from "socket.io";
 import app from "./app"; 
 import { chatHandler } from "./sockets/chat.socket";
 import prisma from "./config/prisma";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { storyCleanupJob } from "./jobs/storyCleanup";
 import { snapCleanupJob } from "./jobs/snapCleanup";
 
