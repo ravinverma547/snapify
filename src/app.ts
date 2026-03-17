@@ -91,7 +91,7 @@ app.get(`${API_VERSION}/health`, (_req, res) => {
 });
 
 app.get("/", (_req, res) => {
-  res.send("Snapify Backend is Live! 🚀");
+  res.send("Snapify Backend is Live! (v1.1-Prod) 🚀");
 });
 
 // Simple route to serve the test client (also available at /test-client.html)
