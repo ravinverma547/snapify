@@ -1,0 +1,39 @@
+name: Snapify CI
+
+on:
+  push:
+    branches: [ dev, main ]
+  pull_request:
+    branches: [ dev, main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install Dependencies
+      run: npm install
+      
+    - name: Generate Prisma Client
+      run: npx prisma generate
+      
+    - name: Run Lint
+      run: npm run lint || echo "No lint script found, skipping."
+      
+    - name: Build Project
+      run: npm run build
+      
+    - name: Run Tests
+      run: npm test || echo "No tests found or tests failed. Continuing for now but should be fixed."

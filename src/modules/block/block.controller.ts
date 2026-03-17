@@ -9,6 +9,9 @@ export class BlockController {
       const { blockUserId } = req.body;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!blockUserId) return res.status(400).json({ success: false, message: "Target user ID missing" });
+
       if (myId === blockUserId) {
         return res.status(400).json({ success: false, message: "Apne aap ko block mat karo!" });
       }
@@ -17,8 +20,8 @@ export class BlockController {
       await prisma.friendship.deleteMany({
         where: {
           OR: [
-            { requesterId: myId!, addresseeId: blockUserId },
-            { requesterId: blockUserId, addresseeId: myId! }
+            { requesterId: myId, addresseeId: blockUserId },
+            { requesterId: blockUserId, addresseeId: myId }
           ]
         }
       });
@@ -26,7 +29,7 @@ export class BlockController {
       // Ab BLOCKED record banao (sirf ek direction: myId ne blockUserId ko block kiya)
       await prisma.friendship.create({
         data: {
-          requesterId: myId!,
+          requesterId: myId,
           addresseeId: blockUserId,
           status: "BLOCKED",
         }
@@ -34,7 +37,8 @@ export class BlockController {
 
       res.status(200).json({ success: true, message: "User blocked successfully" });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[BlockController.blockUser] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while blocking user" });
     }
   }
 
@@ -42,6 +46,7 @@ export class BlockController {
   async getBlockedUsers(req: AuthRequest, res: Response) {
     try {
       const myId = req.user?.id;
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
       const blockedList = await prisma.friendship.findMany({
         where: { requesterId: myId, status: "BLOCKED" },
@@ -52,9 +57,10 @@ export class BlockController {
         }
       });
 
-      res.status(200).json({ success: true, data: blockedList });
+      res.status(200).json({ success: true, data: blockedList || [] });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[BlockController.getBlockedUsers] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching blocked users" });
     }
   }
 
@@ -64,9 +70,8 @@ export class BlockController {
       const unblockUserId = req.params.unblockUserId as string;
       const myId = req.user?.id;
 
-      if (!unblockUserId || !myId) {
-        return res.status(400).json({ success: false, message: "IDs missing hain" });
-      }
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!unblockUserId) return res.status(400).json({ success: false, message: "Target user ID missing" });
 
       const result = await prisma.friendship.deleteMany({
         where: {
@@ -80,9 +85,10 @@ export class BlockController {
         return res.status(404).json({ success: false, message: "Block record nahi mila" });
       }
 
-      res.status(200).json({ success: true, message: "User unblocked. Ab vo friend request bhej sakta hai." });
+      res.status(200).json({ success: true, message: "User unblocked successfully" });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[BlockController.unblockUser] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while unblocking user" });
     }
   }
-}
+}

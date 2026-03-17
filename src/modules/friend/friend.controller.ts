@@ -9,9 +9,11 @@ export class FriendController {
       const { addresseeId } = req.body;
       const requesterId = req.user?.id;
 
-      if (!requesterId) return res.status(401).json({ message: "Unauthorized" });
+      if (!requesterId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!addresseeId) return res.status(400).json({ success: false, message: "Addressee ID missing" });
+
       if (requesterId === addresseeId) {
-        return res.status(400).json({ message: "Khud ko add nahi kar sakte!" });
+        return res.status(400).json({ success: false, message: "Khud ko add nahi kar sakte!" });
       }
 
       // Block check: agar kisi ne bhi block kiya hai toh request nahi bheji ja sakti
@@ -61,7 +63,7 @@ export class FriendController {
       res.status(201).json({ success: true, data: friendship });
     } catch (error: any) {
       console.error("[FriendController.sendRequest] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while sending request" });
     }
   }
 
@@ -71,8 +73,9 @@ export class FriendController {
       const requestId = req.params.requestId as string;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!requestId) {
-        return res.status(400).json({ message: "Request ID zaroori hai!" });
+        return res.status(400).json({ success: false, message: "Request ID missing" });
       }
 
       const checkRequest = await prisma.friendship.findUnique({
@@ -80,7 +83,7 @@ export class FriendController {
       });
 
       if (!checkRequest || checkRequest.addresseeId !== myId) {
-        return res.status(404).json({ message: "Request nahi mili ya aap ise accept nahi kar sakte!" });
+        return res.status(404).json({ success: false, message: "Request nahi mili ya aap ise accept nahi kar sakte!" });
       }
 
       const friendship = await prisma.friendship.update({
@@ -92,7 +95,7 @@ export class FriendController {
         data: {
           type: "REQUEST_ACCEPTED",
           content: `Aapki friend request accept kar li gayi hai! ✨`,
-          senderId: myId!,
+          senderId: myId,
           receiverId: friendship.requesterId,
         },
       });
@@ -100,7 +103,7 @@ export class FriendController {
       res.status(200).json({ success: true, message: "Ab aap dost hain!" });
     } catch (error: any) {
       console.error("[FriendController.acceptRequest] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while accepting request" });
     }
   }
 
@@ -110,12 +113,15 @@ export class FriendController {
       const requestId = req.params.requestId as string;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!requestId) return res.status(400).json({ success: false, message: "Request ID missing" });
+
       const checkRequest = await prisma.friendship.findUnique({
         where: { id: requestId }
       });
 
       if (!checkRequest || checkRequest.addresseeId !== myId) {
-        return res.status(404).json({ message: "Request nahi mili!" });
+        return res.status(404).json({ success: false, message: "Request nahi mili!" });
       }
 
       await prisma.friendship.delete({ where: { id: requestId } });
@@ -123,7 +129,7 @@ export class FriendController {
       res.status(200).json({ success: true, message: "Request reject kar di gayi." });
     } catch (error: any) {
       console.error("[FriendController.rejectRequest] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while rejecting request" });
     }
   }
 
@@ -131,6 +137,9 @@ export class FriendController {
   async getFriendsList(req: AuthRequest, res: Response) {
     try {
       const myId = req.user?.id;
+      if (!myId) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+      }
 
       const friendshipData = await prisma.friendship.findMany({
         where: {
@@ -145,14 +154,14 @@ export class FriendController {
         }
       });
 
-      const friends = friendshipData.map(f => {
+      const friends = (friendshipData || []).map(f => {
         return f.requesterId === myId ? f.addressee : f.requester;
       });
 
       res.status(200).json({ success: true, data: friends });
     } catch (error: any) {
       console.error("[FriendController.getFriendsList] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while fetching friends list" });
     }
   }
 
@@ -160,6 +169,7 @@ export class FriendController {
   async getPendingRequests(req: AuthRequest, res: Response) {
     try {
       const myId = req.user?.id;
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
       const pendingRequests = await prisma.friendship.findMany({
         where: { addresseeId: myId, status: "PENDING" },
@@ -169,10 +179,10 @@ export class FriendController {
         orderBy: { createdAt: "desc" }
       });
 
-      res.status(200).json({ success: true, data: pendingRequests });
+      res.status(200).json({ success: true, data: pendingRequests || [] });
     } catch (error: any) {
       console.error("[FriendController.getPendingRequests] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while fetching pending requests" });
     }
   }
 
@@ -181,6 +191,9 @@ export class FriendController {
     try {
       const myId = req.user?.id;
       const userId = req.params.userId as string;
+
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!userId) return res.status(400).json({ success: false, message: "User ID missing" });
 
       const friendship = await prisma.friendship.findFirst({
         where: {
@@ -202,7 +215,7 @@ export class FriendController {
       });
     } catch (error: any) {
       console.error("[FriendController.getFriendshipStatus] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while checking friendship status" });
     }
   }
 
@@ -211,6 +224,9 @@ export class FriendController {
     try {
       const myId = req.user?.id;
       const friendId = req.params.friendId as string;
+
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!friendId) return res.status(400).json({ success: false, message: "Friend ID missing" });
 
       const deleted = await prisma.friendship.deleteMany({
         where: {
@@ -229,7 +245,7 @@ export class FriendController {
       res.status(200).json({ success: true, message: "Friend remove kar diya. Ab messaging band hai." });
     } catch (error: any) {
       console.error("[FriendController.unfriendUser] Error:", error);
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: "Server error while unfriending" });
     }
   }
 }

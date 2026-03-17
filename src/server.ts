@@ -82,7 +82,19 @@ server.listen(PORT, async () => {
 });
 
 process.on("SIGINT", async () => {
+  console.log("Shutting down gracefully... ⏳");
+  await prisma.$disconnect();
   process.exit(0);
+});
+
+// AUTO-RECOVERY: Catch unhandled crashes
+process.on("uncaughtException", (err) => {
+  console.error("CRITICAL: Uncaught Exception! 🚨", err);
+  // In production, you might want to restart the process
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("CRITICAL: Unhandled Rejection at:", promise, "reason:", reason);
 });
 
 export default app;

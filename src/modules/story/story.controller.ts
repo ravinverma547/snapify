@@ -10,6 +10,7 @@ export class StoryController {
       const authorId = req.user?.id;
       const file = req.file;
 
+      if (!authorId) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!file) {
         return res.status(400).json({ success: false, message: "Story file upload nahi hui!" });
       }
@@ -23,16 +24,17 @@ export class StoryController {
       const story = await prisma.story.create({
         data: {
           url,
-          mediaType,
+          mediaType: mediaType || "IMAGE",
           privacy: privacy || "FRIENDS",
           expiresAt,
-          authorId: authorId!,
+          authorId: authorId,
         },
       });
 
       res.status(201).json({ success: true, data: story });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[StoryController.postStory] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while posting story" });
     }
   }
 
@@ -40,6 +42,7 @@ export class StoryController {
   async getFeed(req: AuthRequest, res: Response) {
     try {
       const myId = req.user?.id;
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
       // Pehle apne friends ki IDs nikalon
       const myFriends = await prisma.friendship.findMany({
@@ -49,12 +52,12 @@ export class StoryController {
         },
       });
 
-      const friendIds = myFriends.map((f) => 
+      const friendIds = (myFriends || []).map((f) => 
         f.requesterId === myId ? f.addresseeId : f.requesterId
       );
 
       // Add my own ID to the list to see my own stories
-      const allIds = [...friendIds, myId as string];
+      const allIds = [...friendIds, myId];
 
       // Sirf wo stories jo abhi tak expire nahi hui hain
       const stories = await prisma.story.findMany({
@@ -69,9 +72,10 @@ export class StoryController {
         orderBy: { createdAt: "desc" },
       });
 
-      res.status(200).json({ success: true, data: stories });
+      res.status(200).json({ success: true, data: stories || [] });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[StoryController.getFeed] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching story feed" });
     }
   }
 
@@ -80,6 +84,9 @@ export class StoryController {
     try {
       const { storyId } = req.params;
       const viewerId = req.user?.id;
+
+      if (!viewerId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!storyId) return res.status(400).json({ success: false, message: "Story ID missing" });
 
       const story = await prisma.story.findUnique({ where: { id: storyId as string } });
       if (!story) return res.status(404).json({ success: false, message: "Story nahi mili" });
@@ -90,20 +97,21 @@ export class StoryController {
           where: {
             storyId_viewerId: {
               storyId: storyId as string,
-              viewerId: viewerId!,
+              viewerId: viewerId,
             },
           },
           update: {},
           create: {
             storyId: storyId as string,
-            viewerId: viewerId!,
+            viewerId: viewerId,
           },
         });
       }
 
       res.status(200).json({ success: true, message: "Story viewed" });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[StoryController.viewStory] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while updating view" });
     }
   }
 
@@ -112,6 +120,9 @@ export class StoryController {
     try {
       const { storyId } = req.params;
       const myId = req.user?.id;
+
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!storyId) return res.status(400).json({ success: false, message: "Story ID missing" });
 
       const story = await prisma.story.findUnique({
         where: { id: storyId as string },
@@ -129,9 +140,10 @@ export class StoryController {
         orderBy: { viewedAt: 'desc' }
       });
 
-      res.status(200).json({ success: true, data: views });
+      res.status(200).json({ success: true, data: views || [] });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[StoryController.getStoryViews] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching story views" });
     }
   }
-}
+}

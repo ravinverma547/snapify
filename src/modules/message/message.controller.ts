@@ -11,6 +11,7 @@ export class MessageController {
       const senderId = req.user?.id;
       const file = req.file;
 
+      if (!senderId) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!conversationId) {
         return res.status(400).json({ success: false, message: "Conversation ID zaroori hai" });
       }
@@ -73,7 +74,7 @@ export class MessageController {
         }
       } else {
         // For Group chats: Only Ensure sender is in the group participantIds
-        if (!conversation.participantIds.includes(senderId!)) {
+        if (!conversation.participantIds.includes(senderId)) {
            return res.status(403).json({
              success: false,
              message: "Aap is group ke member nahi hain."
@@ -87,7 +88,7 @@ export class MessageController {
           content,
           mediaUrl,
           type: type || "TEXT",
-          senderId: senderId!,
+          senderId: senderId,
           conversationId: conversationId as string,
         },
         include: {
@@ -149,23 +150,24 @@ export class MessageController {
           } catch (aiErr) {
             console.error("❌ My AI Error:", aiErr);
             const io = req.app.get("io");
-            if (io && aiUser) io.to(senderId!).emit("typing_status", { senderId: aiUser.id, isTyping: false });
+            if (io && aiUser) io.to(senderId).emit("typing_status", { senderId: aiUser.id, isTyping: false });
           }
         }
       }
 
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[MessageController.sendMessage] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while sending message" });
     }
   }
 
   // 2. Chat ki saari Messages fetch karna (History)
   async getChatMessages(req: AuthRequest, res: Response) {
     try {
-      // FIX: 'as string' casting taaki TS error na de
       const conversationId = req.params.conversationId as string;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!conversationId) {
         return res.status(400).json({ success: false, message: "Conversation ID missing hai" });
       }
@@ -193,11 +195,12 @@ export class MessageController {
       res.status(200).json({ 
         success: true, 
         count: messages.length, 
-        data: messages 
+        data: messages || []
       });
 
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[MessageController.getChatMessages] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching messages" });
     }
   }
 
@@ -207,6 +210,7 @@ export class MessageController {
       const messageId = req.params.messageId;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
       if (!messageId) {
         return res.status(400).json({ success: false, message: "Message ID zaroori hai" });
       }
@@ -236,7 +240,8 @@ export class MessageController {
 
       res.status(200).json({ success: true, message: "Message unsend ho gaya" });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[MessageController.unsendMessage] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while unsending message" });
     }
   }
 }

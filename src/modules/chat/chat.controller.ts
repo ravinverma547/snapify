@@ -4,19 +4,20 @@ import { AuthRequest } from "../../middlewares/auth.middleware";
 
 export class ChatController {
   // 1. Nayi Conversation shuru karna ya existing dhoondna
- async accessConversation(req: AuthRequest, res: Response) {
+  async accessConversation(req: AuthRequest, res: Response) {
     try {
       const { receiverId } = req.body;
       const myId = req.user?.id;
 
-      if (!receiverId) return res.status(400).json({ message: "Receiver ID zaroori hai" });
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!receiverId) return res.status(400).json({ success: false, message: "Receiver ID zaroori hai" });
 
       // Step 1: Existing conversation dhoondo
       let conversation = await prisma.conversation.findFirst({
         where: {
           isGroup: false,
           participantIds: {
-            hasEvery: [myId!, receiverId]
+            hasEvery: [myId, receiverId]
           }
         },
         include: {
@@ -29,10 +30,9 @@ export class ChatController {
       if (!conversation) {
         conversation = await prisma.conversation.create({
           data: {
-            participantIds: [myId!, receiverId],
+            participantIds: [myId, receiverId],
             isGroup: false,
           },
-          // FIX: Yahan bhi 'messages' include karna hoga taaki Type mismatch na ho
           include: {
             messages: { take: 1, orderBy: { createdAt: 'desc' } }, 
             participants: { select: { id: true, username: true, avatarUrl: true } }
@@ -42,7 +42,8 @@ export class ChatController {
 
       res.status(200).json({ success: true, data: conversation });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[ChatController.accessConversation] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while accessing conversation" });
     }
   }
 
@@ -50,6 +51,7 @@ export class ChatController {
   async getMyChats(req: AuthRequest, res: Response) {
     try {
       const myId = req.user?.id;
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
       const chats = await prisma.conversation.findMany({
         where: {
@@ -66,12 +68,12 @@ export class ChatController {
       try {
         const aiUser = await prisma.user.findUnique({ where: { username: "my_ai" } });
         if (aiUser && aiUser.id !== myId) {
-          const hasAiChat = chats.some(c => !c.isGroup && c.participantIds.includes(aiUser.id));
+          const hasAiChat = (chats || []).some(c => !c.isGroup && c.participantIds.includes(aiUser.id));
           if (!hasAiChat) {
              const newAiChat = await prisma.conversation.create({
                 data: {
                   isGroup: false,
-                  participantIds: [myId!, aiUser.id]
+                  participantIds: [myId, aiUser.id]
                 },
                 include: {
                   participants: { select: { id: true, username: true, avatarUrl: true } },
@@ -82,12 +84,13 @@ export class ChatController {
           }
         }
       } catch (e) {
-        console.error("Failed to inject My AI chat:", e);
+        console.error("[ChatController.getMyChats] My AI injection failed:", e);
       }
 
-      res.status(200).json({ success: true, data: chats });
+      res.status(200).json({ success: true, data: chats || [] });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[ChatController.getMyChats] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching chats" });
     }
   }
 
@@ -97,13 +100,16 @@ export class ChatController {
       const chatId = req.params.chatId as string;
       const myId = req.user?.id;
 
+      if (!myId) return res.status(401).json({ success: false, message: "Unauthorized" });
+      if (!chatId) return res.status(400).json({ success: false, message: "Chat ID missing" });
+
       const chat = await prisma.conversation.findUnique({ where: { id: chatId } });
       if (!chat) return res.status(404).json({ success: false, message: "Chat nahi mili" });
       if (chat.isGroup) return res.status(400).json({ success: false, message: "Ye group chat hai, isse group settings se delete karein" });
-      if (!chat.participantIds.includes(myId!)) return res.status(403).json({ success: false, message: "Aap is chat ka hissa nahi hain" });
+      if (!chat.participantIds.includes(myId)) return res.status(403).json({ success: false, message: "Aap is chat ka hissa nahi hain" });
 
       const messages = await prisma.message.findMany({ where: { conversationId: chatId }});
-      const messageIds = messages.map(m => m.id);
+      const messageIds = (messages || []).map(m => m.id);
 
       await prisma.reaction.deleteMany({ where: { messageId: { in: messageIds } } });
       await prisma.message.deleteMany({ where: { conversationId: chatId } });
@@ -112,7 +118,8 @@ export class ChatController {
 
       res.status(200).json({ success: true, message: "Chat delete ho gayi" });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[ChatController.deleteChat] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while deleting chat" });
     }
   }
-}
+}

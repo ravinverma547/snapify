@@ -17,10 +17,13 @@ import reportRoutes from "./modules/report/report.routes";
 import blockRoutes from "./modules/block/block.routes";
 import reactionRoutes from "./modules/reaction/reaction.routes";
 import streakRoutes from "./modules/streak/streak.routes";
+import morgan from "morgan";
+import logger from "./utils/logger";
 
 const app = express();
 
 // 1. Middlewares
+app.use(morgan("dev")); // Request logging
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
@@ -77,6 +80,16 @@ app.use(`${API_VERSION}/reactions`, reactionRoutes);
 app.use(`${API_VERSION}/streaks`, streakRoutes);
 
 // 3. Health Check
+app.get(`${API_VERSION}/health`, (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    message: "Snapify Backend is healthy 🚀",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    env: process.env.NODE_ENV || "development"
+  });
+});
+
 app.get("/", (_req, res) => {
   res.send("Snapify Backend is Live! 🚀");
 });
@@ -86,13 +99,18 @@ app.get("/test-client", (_req, res) => {
   res.sendFile(path.join(__dirname, "..", "public", "test-client.html"));
 });
 
-// 4. Global Error Handler (Optional but helpful)
+// 4. Global Error Handler
 app.use((err: any, req: any, res: any, next: any) => {
-  console.error("Global Error Handler:", err);
+  console.error(`[GlobalError] ${new Date().toISOString()}:`, err);
+  
   const statusCode = err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  
   res.status(statusCode).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    status: statusCode,
+    message: message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined
   });
 });
 

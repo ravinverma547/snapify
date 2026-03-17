@@ -12,11 +12,16 @@ export const notificationHandler = (io: Server, socket: Socket) => {
   socket.on("send_notification", (data: any) => {
     const { receiverId, senderName, content } = data;
     
+    if (!receiverId) return console.warn("[NotificationSocket] receiverId missing");
+
+    const cleanReceiverId = receiverId.toString().trim().replace(/['"]+/g, '');
+
     // Sirf us bande ko bhejona jiski ID receiverId hai
-    socket.to(receiverId).emit("notification_received", {
-      title: `New Snap from ${senderName}`,
-      message: content,
+    io.to(cleanReceiverId).emit("notification_received", {
+      title: `Message from ${senderName || 'someone'}`,
+      message: content || 'New notification',
       time: new Date()
     });
+    console.log(`[Socket] Notification alert sent to: ${cleanReceiverId}`);
   });
 };

@@ -21,25 +21,35 @@ export const chatHandler = (io: Server, socket: Socket) => {
   // 3. PERSONAL LOGIC (Direct to Person)
   socket.on("new_message", (payload: any) => {
     const { senderId, content, receiverId, messageId, roomId } = payload;
+    
+    // Safety Checks
+    if (!senderId) return console.warn("[ChatSocket] senderId missing in new_message");
+
     const cleanReceiverId = receiverId?.toString().trim();
     const cleanRoomId = roomId?.toString().trim();
 
+    // Strategy: Emit to conversation room AND individual receiver room for reliable delivery
     if (cleanRoomId) {
-      // Broadcast to everyone in the conversation room
       io.to(cleanRoomId).emit("message_received", { ...payload, roomId: cleanRoomId });
-    } else if (cleanReceiverId) {
-      // Fallback for notifications if room not joined
-      io.to(cleanReceiverId).emit("message_received", { ...payload });
+      console.log(`[Socket] Msg sent to room: ${cleanRoomId}`);
     }
 
     if (cleanReceiverId) {
+      // Direct emit as fallback if user is online but hasn't joined the chat room
+      io.to(cleanReceiverId).emit("message_received", { ...payload });
+      
+      // Also send notification alert
       io.to(cleanReceiverId).emit("notification_received", {
-        title: `Private Snap from ${senderId}`,
+        title: `Message from ${senderId}`,
         message: content,
         receiverId: cleanReceiverId
       });
+      console.log(`[Socket] Msg/Notification sent to user room: ${cleanReceiverId}`);
     }
-    console.log(`👤 Msg: ${senderId} -> Room: ${cleanRoomId || cleanReceiverId}`);
+
+    if (!cleanRoomId && !cleanReceiverId) {
+      console.warn("[ChatSocket] Neither roomId nor receiverId provided for delivery");
+    }
   });
 
   // 4. GROUP LOGIC (Broadcast to Room)

@@ -3,21 +3,23 @@ import prisma from "../../config/prisma";
 import { AuthRequest } from "../../middlewares/auth.middleware";
 
 export class ReactionController {
-async toggleReaction(req: AuthRequest, res: Response) {
-  try {
-    const { messageId, emoji } = req.body;
-    const userId = req.user?.id;
-    const io = req.app.get("socketio");
+  async toggleReaction(req: AuthRequest, res: Response) {
+    try {
+      const { messageId, emoji } = req.body;
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    // 🔥 MAGIC LINES: Agar ID database wali nahi hai, toh seedha socket chala do
-    // Isse aapka niche ka Prisma code crash nahi hoga
-    if (messageId.startsWith("msg-")) {
-        if (io) io.emit("reaction_updated", { messageId, emoji, actionType: "ADDED" });
-        return res.status(200).json({ success: true, message: "Socket updated" });
-    }
+      const io = req.app.get("socketio");
+
+      // 🔥 MAGIC LINES: Agar ID database wali nahi hai, toh seedha socket chala do
+      if (messageId && messageId.startsWith("msg-")) {
+          if (io) io.emit("reaction_updated", { messageId, emoji, actionType: "ADDED" });
+          return res.status(200).json({ success: true, message: "Socket updated (Mock)" });
+      }
+
+      if (!messageId) return res.status(400).json({ success: false, message: "Message ID missing" });
 
       // 1. Message check karo
-      // Note: messageId as string use kiya hai Type Error hatane ke liye
       const message = await prisma.message.findUnique({
         where: { id: messageId as string },
         select: { conversationId: true, senderId: true },
@@ -31,7 +33,7 @@ async toggleReaction(req: AuthRequest, res: Response) {
       const existingReaction = await prisma.reaction.findUnique({
         where: {
           userId_messageId: {
-            userId: userId!,
+            userId: userId,
             messageId: messageId as string,
           },
         },
@@ -57,7 +59,7 @@ async toggleReaction(req: AuthRequest, res: Response) {
         const newReaction = await prisma.reaction.create({
           data: {
             emoji,
-            userId: userId!,
+            userId: userId,
             messageId: messageId as string,
           },
         });
@@ -67,7 +69,8 @@ async toggleReaction(req: AuthRequest, res: Response) {
 
       // --- ⚡ SOCKET REAL-TIME UPDATE ---
       if (io) {
-        io.to(message.conversationId).emit("reaction_updated", {
+        const cleanRoomId = message.conversationId;
+        io.to(cleanRoomId).emit("reaction_updated", {
           messageId,
           emoji,
           userId,
@@ -79,7 +82,7 @@ async toggleReaction(req: AuthRequest, res: Response) {
             data: {
               type: "REACTION",
               content: `Someone reacted ${emoji} to your message`,
-              senderId: userId!,
+              senderId: userId,
               receiverId: message.senderId,
             },
           });
@@ -93,16 +96,17 @@ async toggleReaction(req: AuthRequest, res: Response) {
 
       return res.status(200).json({ success: true, ...finalData, actionType });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[ReactionController.toggleReaction] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while toggling reaction" });
     }
   }
 
   async getMessageReactions(req: AuthRequest, res: Response) {
     try {
       const { messageId } = req.params;
-
-      // FIX: messageId ko explicitly string mein convert kiya Type Error hatane ke liye
       const idToSearch = Array.isArray(messageId) ? messageId[0] : messageId;
+
+      if (!idToSearch) return res.status(400).json({ success: false, message: "ID missing" });
 
       const reactions = await prisma.reaction.findMany({
         where: { messageId: idToSearch },
@@ -110,9 +114,10 @@ async toggleReaction(req: AuthRequest, res: Response) {
           user: { select: { username: true, avatarUrl: true } },
         },
       });
-      res.status(200).json({ success: true, data: reactions });
+      res.status(200).json({ success: true, data: reactions || [] });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      console.error("[ReactionController.getMessageReactions] Error:", error);
+      res.status(500).json({ success: false, message: "Server error while fetching reactions" });
     }
   }
-}
+}
