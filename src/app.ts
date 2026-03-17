@@ -27,7 +27,9 @@ app.use((req, res, next) => {
     "https://snapify-eight-zeta.vercel.app",
     "https://snapify-backend-o0yt.onrender.com",
     "http://localhost:5001",
-    "http://localhost:5173"
+    "http://localhost:5173",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500"
   ];
 
   if (origin) {

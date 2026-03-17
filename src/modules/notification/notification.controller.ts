@@ -20,6 +20,7 @@ export class NotificationController {
 
       res.status(200).json({ success: true, data: notifications });
     } catch (error: any) {
+      console.error("[NotificationController.getMyNotifications] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -40,6 +41,7 @@ export class NotificationController {
 
       res.status(200).json({ success: true, message: "Notification read!" });
     } catch (error: any) {
+      console.error("[NotificationController.markAsRead] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -56,6 +58,7 @@ export class NotificationController {
 
       res.status(200).json({ success: true, message: "Sab read ho gaya!" });
     } catch (error: any) {
+      console.error("[NotificationController.markAllAsRead] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }

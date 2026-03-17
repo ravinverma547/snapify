@@ -60,6 +60,7 @@ export class FriendController {
 
       res.status(201).json({ success: true, data: friendship });
     } catch (error: any) {
+      console.error("[FriendController.sendRequest] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -98,6 +99,7 @@ export class FriendController {
 
       res.status(200).json({ success: true, message: "Ab aap dost hain!" });
     } catch (error: any) {
+      console.error("[FriendController.acceptRequest] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -120,6 +122,7 @@ export class FriendController {
 
       res.status(200).json({ success: true, message: "Request reject kar di gayi." });
     } catch (error: any) {
+      console.error("[FriendController.rejectRequest] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -148,6 +151,7 @@ export class FriendController {
 
       res.status(200).json({ success: true, data: friends });
     } catch (error: any) {
+      console.error("[FriendController.getFriendsList] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -167,6 +171,7 @@ export class FriendController {
 
       res.status(200).json({ success: true, data: pendingRequests });
     } catch (error: any) {
+      console.error("[FriendController.getPendingRequests] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -196,6 +201,7 @@ export class FriendController {
         data: { status: friendship.status, requestId: friendship.id, isSender }
       });
     } catch (error: any) {
+      console.error("[FriendController.getFriendshipStatus] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
@@ -222,6 +228,7 @@ export class FriendController {
 
       res.status(200).json({ success: true, message: "Friend remove kar diya. Ab messaging band hai." });
     } catch (error: any) {
+      console.error("[FriendController.unfriendUser] Error:", error);
       res.status(500).json({ success: false, message: error.message });
     }
   }
